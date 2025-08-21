@@ -1,9 +1,5 @@
 # To install xgboost: pip install xgboost
 
-import warnings
-# Suppress the specific FutureWarning from scikit-learn's ColumnTransformer
-warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn.compose._column_transformer")
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,7 +7,6 @@ import seaborn as sns
 import time
 import joblib
 import os
-from tqdm import tqdm # For progress bars
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -25,21 +20,6 @@ from xgboost import XGBClassifier # Import XGBClassifier
 
 # --- Configuration ---
 SHOW_PLOTS = False  # Set to True to display plots, False to suppress them
-VERBOSE_OUTPUT = False # Set to True for more detailed print statements
-
-# --- Configuration for Automated Parameter Search ---
-TARGET_RUN_TIME_MINUTES = 5.0  # Target maximum runtime for the full analysis
-MAX_SEARCH_TIME_MINUTES = 5.0 # Maximum time to spend searching for optimal parameters
-RUN_PARAMETER_SEARCH = True   # Set to True to run the automated parameter search
-
-# Define parameter options to iterate through for automated search
-LR_C_OPTIONS = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
-RF_N_ESTIMATORS_OPTIONS = [100, 200, 300, 400, 500]
-RF_MAX_DEPTH_OPTIONS = [10, 15, 20, 25, 30, None]
-RF_MIN_SAMPLES_SPLIT_OPTIONS = [2, 5, 10]
-RF_MIN_SAMPLES_LEAF_OPTIONS = [1, 2, 4]
-XGB_N_ESTIMATORS_OPTIONS = [50, 100, 200, 300, 400, 500]
-XGB_LEARNING_RATE_OPTIONS = [0.01, 0.05, 0.1, 0.2, 0.3]
 
 # --- Data Loading Function ---
 def load_data(file_path):
@@ -64,22 +44,26 @@ def harmonize_datasets(df_synthetic, df_uci):
         print("Cannot harmonize: One or both DataFrames are None.")
         return None
 
-    if VERBOSE_OUTPUT: print("\n--- Harmonizing Datasets ---")
+    print("\n--- Harmonizing Datasets ---")
 
     # Make copies to avoid modifying original DataFrames
     df_synthetic_harmonized = df_synthetic.copy()
     df_uci_harmonized = df_uci.copy()
 
+    print("\n--- Debugging: Initial Columns ---")
+    print("Synthetic DF Columns:", df_synthetic_harmonized.columns.tolist())
+    print("UCI DF Columns:", df_uci_harmonized.columns.tolist())
+
     # 1. Rename columns in UCI dataset to match synthetic dataset
     # Correcting 'thalch' to 'thalach'
     if 'thalch' in df_uci_harmonized.columns:
         df_uci_harmonized.rename(columns={'thalch': 'thalach'}, inplace=True)
-        if VERBOSE_OUTPUT: print("Renamed 'thalch' to 'thalach' in UCI dataset.")
+        print("Renamed 'thalch' to 'thalach' in UCI dataset.")
 
     # Correcting target column from 'num' to 'heart_disease'
     if 'num' in df_uci_harmonized.columns:
         df_uci_harmonized.rename(columns={'num': 'heart_disease'}, inplace=True)
-        if VERBOSE_OUTPUT: print("Renamed 'num' to 'heart_disease' in UCI dataset.")
+        print("Renamed 'num' to 'heart_disease' in UCI dataset.")
 
     # 2. Re-encode 'thal' column in UCI dataset
     # Synthetic thal: 3=normal, 6=fixed defect, 7=reversible defect
@@ -89,31 +73,37 @@ def harmonize_datasets(df_synthetic, df_uci):
         # Convert thal to numeric first to handle potential non-numeric values before mapping
         df_uci_harmonized['thal'] = pd.to_numeric(df_uci_harmonized['thal'], errors='coerce')
         df_uci_harmonized['thal'] = df_uci_harmonized['thal'].map(thal_mapping_uci_to_synthetic)
-        if VERBOSE_OUTPUT: print("Re-encoded 'thal' column in UCI dataset.")
+        print("Re-encoded 'thal' column in UCI dataset.")
 
     # 3. Add 'source' column to both datasets
     if 'source' not in df_synthetic_harmonized.columns:
         df_synthetic_harmonized['source'] = 'Synthetic' # Assuming original synthetic data doesn't have it
-    if VERBOSE_OUTPUT: print("Ensured 'source' column in synthetic dataset.")
+    print("Ensured 'source' column in synthetic dataset.")
 
     df_uci_harmonized['source'] = 'UCI'
-    if VERBOSE_OUTPUT: print("Added 'source' column to UCI dataset.")
+    print("Added 'source' column to UCI dataset.")
 
     # 4. Handle features unique to synthetic dataset: 'smoking', 'diabetes', 'bmi'
     unique_synthetic_features = ['smoking', 'diabetes', 'bmi']
     for feature in unique_synthetic_features:
         if feature not in df_uci_harmonized.columns:
             df_uci_harmonized[feature] = 0  # Impute with 0
-            if VERBOSE_OUTPUT: print(f"Added and imputed '{feature}' with 0 for UCI dataset.")
+            print(f"Added and imputed '{feature}' with 0 for UCI dataset.")
+
+    print("\n--- Debugging: Columns after initial harmonization steps ---")
+    print("Synthetic DF Harmonized Columns:", df_synthetic_harmonized.columns.tolist())
+    print("UCI DF Harmonized Columns:", df_uci_harmonized.columns.tolist())
 
     # Ensure both dataframes have the exact same columns in the same order before concatenation
     # Get all columns from the synthetic dataset (which now includes 'source' and original unique features)
     final_columns = df_synthetic_harmonized.columns.tolist()
+    print("\n--- Debugging: Final Columns for Alignment ---")
+    print("Final Columns:", final_columns)
 
     # Reorder UCI columns to match synthetic dataset's column order
     df_uci_harmonized = df_uci_harmonized[final_columns].copy()
 
-    if VERBOSE_OUTPUT: print("Datasets harmonized successfully. Ready for concatenation.")
+    print("Datasets harmonized successfully. Ready for concatenation.")
     return df_synthetic_harmonized, df_uci_harmonized
 
 # --- Exploratory Data Analysis (EDA) Function ---
@@ -127,26 +117,23 @@ def perform_eda(df, dataset_name, numerical_features, categorical_features):
         print(f"Cannot perform EDA: {dataset_name} DataFrame is None.")
         return
 
-    if VERBOSE_OUTPUT:
-        print(f"\n--- EDA for {dataset_name} ---")
-        print("Head:")
-        print(df.head())
-        print("\nInfo:")
-        print(df.info())
-        print("\nDescription:")
-        print(df.describe())
-        print("\nMissing values:")
-        print(df.isnull().sum())
+    print(f"\n--- EDA for {dataset_name} ---")
+    print("Head:")
+    print(df.head())
+    print("\nInfo:")
+    print(df.info())
+    print("\nDescription:")
+    print(df.describe())
+    print("\nMissing values:")
+    print(df.isnull().sum())
 
-        target_column = 'heart_disease' # Now consistent across harmonized datasets
-        if target_column in df.columns:
-            print(f"\nTarget distribution ({target_column}):")
-            print(df[target_column].value_counts(normalize=True))
+    target_column = 'heart_disease' # Now consistent across harmonized datasets
+    if target_column in df.columns:
+        print(f"\nTarget distribution ({target_column}):")
+        print(df[target_column].value_counts(normalize=True))
 
-    # Visualize target distribution
-    if SHOW_PLOTS:
-        target_column = 'heart_disease'
-        if target_column in df.columns:
+        # Visualize target distribution
+        if SHOW_PLOTS:
             plt.figure(figsize=(6, 4))
             sns.countplot(x=target_column, data=df)
             plt.title(f'Distribution of {target_column} ({dataset_name})')
@@ -169,7 +156,6 @@ def perform_eda(df, dataset_name, numerical_features, categorical_features):
                     sns.countplot(x=col, data=df)
                     plt.title(f'Distribution of {col} ({dataset_name})')
                     plt.show()
-
 
 # --- Data Preprocessing Function ---
 def preprocess_data(df, target_column, categorical_features, numerical_features):
@@ -208,7 +194,7 @@ def preprocess_data(df, target_column, categorical_features, numerical_features)
             ('cat', categorical_transformer, [f for f in categorical_features if f in features_for_preprocessing])
         ])
 
-    if VERBOSE_OUTPUT: print("\nPreprocessing setup complete.")
+    print("\nPreprocessing setup complete.")
     return X, y, preprocessor
 
 # --- Model Training and Evaluation Function ---
@@ -222,7 +208,7 @@ def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression', p
         return None, None, None
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    if VERBOSE_OUTPUT: print("\nData split into training and testing sets.")
+    print("\nData split into training and testing sets.")
 
     if model_type == 'logistic_regression':
         classifier = LogisticRegression(solver='liblinear', random_state=42, max_iter=1000)
@@ -244,11 +230,7 @@ def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression', p
 
     if param_grid:
         print(f"\nPerforming GridSearchCV for {model_name}...")
-        # Note: GridSearchCV has its own 'verbose' parameter for progress.
-        # For more custom progress bars (e.g., with tqdm), you might need to
-        # implement a custom GridSearchCV callback or wrap the inner loop if possible.
-        # For simple loops, tqdm can be used like: for item in tqdm(my_list):
-        grid_search = GridSearchCV(model_pipeline, param_grid, cv=10, scoring='roc_auc', verbose=1, n_jobs=-1)
+        grid_search = GridSearchCV(model_pipeline, param_grid, cv=5, scoring='roc_auc', verbose=1, n_jobs=-1)
         grid_search.fit(X_train, y_train)
         best_model = grid_search.best_estimator_
         print(f"GridSearchCV complete for {model_name}.")
@@ -378,15 +360,14 @@ if __name__ == "__main__":
         if df_synthetic_harmonized is not None and df_uci_harmonized is not None:
             combined_df = pd.concat([df_synthetic_harmonized, df_uci_harmonized], ignore_index=True)
             print(f"\nCombined dataset created with {len(combined_df)} rows.")
-            if VERBOSE_OUTPUT:
-                print("Combined dataset head:")
-                print(combined_df.head())
-                print("Combined dataset info:")
-                print(combined_df.info())
-                print("Combined dataset description:")
-                print(combined_df.describe())
-                print("Combined dataset missing values:")
-                print(combined_df.isnull().sum())
+            print("Combined dataset head:")
+            print(combined_df.head())
+            print("Combined dataset info:")
+            print(combined_df.info())
+            print("Combined dataset description:")
+            print(combined_df.describe())
+            print("Combined dataset missing values:")
+            print(combined_df.isnull().sum())
 
             # Drop rows where the target column (heart_disease) is NaN
             initial_rows = len(combined_df)
@@ -401,20 +382,20 @@ if __name__ == "__main__":
                     # Convert to string, coercing errors will turn unconvertible values into NaN
                     combined_df[col] = combined_df[col].astype(str)
                     # Fill any NaNs that might have resulted from coercion or were already present
-                    combined_df[col] = combined_df[col].fillna('missing')
-                    if VERBOSE_OUTPUT: print(f"Converted '{col}' to string and filled NaNs.")
+                    combined_df[col].fillna('missing', inplace=True)
+                    print(f"Converted '{col}' to string and filled NaNs.")
 
             # Ensure heart_disease is integer type for classification
             # Note: The UCI dataset has values 0, 1, 2, 3, 4 for heart_disease. 
             # For binary classification, these typically need to be binarized (e.g., >0 means disease).
             # For now, we'll keep them as is, but this is a point for future refinement.
             combined_df[TARGET_COLUMN] = combined_df[TARGET_COLUMN].astype(int)
-            if VERBOSE_OUTPUT: print(f"Converted '{TARGET_COLUMN}' to integer type.")
+            print(f"Converted '{TARGET_COLUMN}' to integer type.")
 
             # Binarize the target variable: 0 = no disease, >0 = disease
             # This is crucial because the UCI dataset has 0-4 values for heart_disease
             combined_df[TARGET_COLUMN] = (combined_df[TARGET_COLUMN] > 0).astype(int)
-            if VERBOSE_OUTPUT: print(f"Binarized '{TARGET_COLUMN}': values > 0 converted to 1.")
+            print(f"Binarized '{TARGET_COLUMN}': values > 0 converted to 1.")
     end_time_harmonize = time.time()
     print(f"Data Harmonization and Combination completed in {end_time_harmonize - start_time_harmonize:.2f} seconds.")
 
@@ -461,39 +442,20 @@ if __name__ == "__main__":
     start_time_train = time.time()
     if X_combined is not None:
         # Define parameter grids for GridSearchCV
-        if RUN_PARAMETER_SEARCH:
-            param_grid_lr = {
-                'classifier__C': LR_C_OPTIONS,
-                'classifier__solver': ['liblinear']
-            }
+        param_grid_lr = {
+            'classifier__C': [1.0], # Minimal C value for quick test
+            'classifier__solver': ['liblinear'] # Minimal solver for quick test
+        }
 
-            param_grid_rf = {
-                'classifier__n_estimators': RF_N_ESTIMATORS_OPTIONS,
-                'classifier__max_depth': RF_MAX_DEPTH_OPTIONS,
-                'classifier__min_samples_split': RF_MIN_SAMPLES_SPLIT_OPTIONS,
-                'classifier__min_samples_leaf': RF_MIN_SAMPLES_LEAF_OPTIONS
-            }
+        param_grid_rf = {
+            'classifier__n_estimators': [100],
+            'classifier__max_depth': [10]
+        }
 
-            param_grid_xgb = {
-                'classifier__n_estimators': XGB_N_ESTIMATORS_OPTIONS,
-                'classifier__learning_rate': XGB_LEARNING_RATE_OPTIONS
-            }
-        else:
-            # Minimal parameter grids for quick testing when RUN_PARAMETER_SEARCH is False
-            param_grid_lr = {
-                'classifier__C': [1.0],
-                'classifier__solver': ['liblinear']
-            }
-
-            param_grid_rf = {
-                'classifier__n_estimators': [100],
-                'classifier__max_depth': [10]
-            }
-
-            param_grid_xgb = {
-                'classifier__n_estimators': [100],
-                'classifier__learning_rate': [0.1]
-            }
+        param_grid_xgb = {
+            'classifier__n_estimators': [100],
+            'classifier__learning_rate': [0.1]
+        }
 
         # Logistic Regression with GridSearchCV
         start_time_lr = time.time()
