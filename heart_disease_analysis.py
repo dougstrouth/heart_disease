@@ -1,16 +1,19 @@
+# To install xgboost: pip install xgboost
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix, classification_report
-from sklearn.impute import SimpleImputer # Import SimpleImputer
+from sklearn.impute import SimpleImputer
+from xgboost import XGBClassifier # Import XGBClassifier
 
 # --- Configuration ---
 SHOW_PLOTS = False  # Set to True to display plots, False to suppress them
@@ -192,9 +195,10 @@ def preprocess_data(df, target_column, categorical_features, numerical_features)
     return X, y, preprocessor
 
 # --- Model Training and Evaluation Function ---
-def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression'):
+def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression', param_grid=None):
     """
     Trains and evaluates a specified machine learning model.
+    If param_grid is provided, performs GridSearchCV for hyperparameter tuning.
     """
     if X is None or y is None or preprocessor is None:
         print("Cannot train/evaluate: Data or preprocessor is None.")
@@ -209,6 +213,9 @@ def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression'):
     elif model_type == 'random_forest':
         classifier = RandomForestClassifier(random_state=42)
         model_name = "Random Forest"
+    elif model_type == 'xgboost': # Add XGBoost
+        classifier = XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
+        model_name = "XGBoost"
     else:
         print(f"Error: Unknown model type '{model_type}'.")
         return None, None, None
@@ -218,12 +225,22 @@ def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression'):
         ('classifier', classifier)
     ])
 
-    print(f"\nTraining {model_name} model...")
-    model_pipeline.fit(X_train, y_train)
-    print("Training complete.")
+    if param_grid:
+        print(f"\nPerforming GridSearchCV for {model_name}...")
+        grid_search = GridSearchCV(model_pipeline, param_grid, cv=5, scoring='roc_auc', verbose=1, n_jobs=-1)
+        grid_search.fit(X_train, y_train)
+        best_model = grid_search.best_estimator_
+        print(f"GridSearchCV complete for {model_name}.")
+        print(f"Best parameters for {model_name}: {grid_search.best_params_}")
+        print(f"Best ROC AUC score for {model_name}: {grid_search.best_score_:.4f}")
+    else:
+        print(f"\nTraining {model_name} model (without tuning)...")
+        model_pipeline.fit(X_train, y_train)
+        best_model = model_pipeline
+        print("Training complete.")
 
-    y_pred = model_pipeline.predict(X_test)
-    y_proba = model_pipeline.predict_proba(X_test)[:, 1]
+    y_pred = best_model.predict(X_test)
+    y_proba = best_model.predict_proba(X_test)[:, 1]
 
     # Evaluate the model
     accuracy = accuracy_score(y_test, y_pred)
@@ -234,7 +251,7 @@ def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression'):
     conf_matrix = confusion_matrix(y_test, y_pred)
     class_report = classification_report(y_test, y_pred)
 
-    print(f"\n--- {model_name} Model Evaluation ---")
+    print(f"\n--- {model_name} Model Evaluation (Best Estimator) ---")
     print(f"Accuracy: {accuracy:.4f}")
     print(f"Precision: {precision:.4f}")
     print(f"Recall: {recall:.4f}")
@@ -254,10 +271,12 @@ def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression'):
         'f1_score': f1,
         'roc_auc': roc_auc,
         'confusion_matrix': conf_matrix,
-        'classification_report': class_report
+        'classification_report': class_report,
+        'best_params': grid_search.best_params_ if param_grid else None,
+        'best_cv_score': grid_search.best_score_ if param_grid else None
     }
 
-    return model_pipeline, y_pred, y_proba, metrics
+    return best_model, y_pred, y_proba, metrics
 
 # --- Model Interpretability Function ---
 def interpret_model(model_pipeline, preprocessor, numerical_features, categorical_features):
@@ -269,6 +288,8 @@ def interpret_model(model_pipeline, preprocessor, numerical_features, categorica
         return None
 
     classifier = model_pipeline.named_steps['classifier']
+    # Access the fitted preprocessor from the model_pipeline
+    fitted_preprocessor = model_pipeline.named_steps['preprocessor']
 
     if hasattr(classifier, 'feature_importances_'):
         print("\n--- Feature Importances ---")
@@ -277,10 +298,10 @@ def interpret_model(model_pipeline, preprocessor, numerical_features, categorica
         # The preprocessor in the pipeline is fitted during model_pipeline.fit()
         # We need to ensure we only get names for features that were actually processed
 
-        processed_numerical_features = [f for f in numerical_features if f in preprocessor.transformers_[0][2]]
-        processed_categorical_features = [f for f in categorical_features if f in preprocessor.transformers_[1][2]]
+        processed_numerical_features = [f for f in numerical_features if f in fitted_preprocessor.transformers_[0][2]]
+        processed_categorical_features = [f for f in categorical_features if f in fitted_preprocessor.transformers_[1][2]]
 
-        ohe_transformer = preprocessor.named_transformers_['cat'].named_steps['onehot']
+        ohe_transformer = fitted_preprocessor.named_transformers_['cat'].named_steps['onehot']
         if hasattr(ohe_transformer, 'get_feature_names_out'):
             ohe_feature_names = ohe_transformer.get_feature_names_out(processed_categorical_features)
         else: # Fallback for older sklearn versions
@@ -381,20 +402,55 @@ if __name__ == "__main__":
 
     # 5. Train and Evaluate Models on Combined Data
     if X_combined is not None:
-        # Logistic Regression on Combined Data
+        # Define parameter grids for GridSearchCV
+        param_grid_lr = {
+            'classifier__C': [0.01, 0.1, 1.0, 10.0, 100.0], # Expanded C values
+            'classifier__solver': ['liblinear', 'lbfgs']
+        }
+
+        param_grid_rf = {
+            'classifier__n_estimators': [150, 200, 250], # More estimators
+            'classifier__max_features': ['sqrt', 'log2', 0.8], # Add a float for max_features
+            'classifier__max_depth': [15, 20, 25, None], # Refine around 20, add None
+            'classifier__min_samples_split': [2, 4, 6], # More granular
+            'classifier__min_samples_leaf': [1, 2, 3] # Add min_samples_leaf
+        }
+
+        param_grid_xgb = {
+            'classifier__n_estimators': [150, 200, 250],
+            'classifier__learning_rate': [0.01, 0.05, 0.1],
+            'classifier__max_depth': [4, 5, 6],
+            'classifier__subsample': [0.7, 0.8, 1.0],
+            'classifier__colsample_bytree': [0.7, 0.8, 1.0],
+            'classifier__gamma': [0, 0.1, 0.2] # Add gamma
+        }
+
+        # Logistic Regression with GridSearchCV
         lr_model_combined, lr_y_pred_combined, lr_y_proba_combined, lr_metrics_combined = train_evaluate_model(
-            X_combined, y_combined, preprocessor_combined, model_type='logistic_regression'
+            X_combined, y_combined, preprocessor_combined, model_type='logistic_regression', param_grid=param_grid_lr
         )
 
-        # Random Forest on Combined Data
+        # Random Forest with GridSearchCV
         rf_model_combined, rf_y_pred_combined, rf_y_proba_combined, rf_metrics_combined = train_evaluate_model(
-            X_combined, y_combined, preprocessor_combined, model_type='random_forest'
+            X_combined, y_combined, preprocessor_combined, model_type='random_forest', param_grid=param_grid_rf
+        )
+
+        # XGBoost with GridSearchCV
+        xgb_model_combined, xgb_y_pred_combined, xgb_y_proba_combined, xgb_metrics_combined = train_evaluate_model(
+            X_combined, y_combined, preprocessor_combined, model_type='xgboost', param_grid=param_grid_xgb
         )
 
         # 6. Model Interpretability (for Random Forest on Combined Data)
+        # Note: XGBoost also has feature importances, but accessing them is similar to RF.
         if rf_model_combined is not None:
             rf_feature_importances_combined = interpret_model(
                 rf_model_combined, preprocessor_combined, features_for_modeling_numerical, features_for_modeling_categorical
             )
+
+        # You can also interpret XGBoost model if needed
+        # if xgb_model_combined is not None:
+        #     xgb_feature_importances_combined = interpret_model(
+        #         xgb_model_combined, preprocessor_combined, features_for_modeling_numerical, features_for_modeling_categorical
+        #     )
 
     print("\n--- Analysis Complete on Combined Dataset ---")
