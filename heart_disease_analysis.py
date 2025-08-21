@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import time
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -333,6 +334,9 @@ def interpret_model(model_pipeline, preprocessor, numerical_features, categorica
 
 # --- Main Execution Block ---
 if __name__ == "__main__":
+    start_time_total = time.time()
+    print("\n--- Starting Heart Disease Analysis ---")
+
     # Define feature lists based on the full set of features after harmonization
     # This includes features unique to synthetic dataset, which are imputed for UCI
     ALL_NUMERICAL_FEATURES = ['age', 'trestbps', 'chol', 'thalach', 'oldpeak', 'bmi']
@@ -340,10 +344,14 @@ if __name__ == "__main__":
     TARGET_COLUMN = 'heart_disease'
 
     # 1. Load Data
+    start_time_load = time.time()
     df_synthetic = load_data('unified_heart_disease_dataset.csv')
     df_uci = load_data('/Users/dougstrouth/Documents/datasets/kaggle_data_sets/data/edwankarimsony/heart-disease-data/heart_disease_uci.csv')
+    end_time_load = time.time()
+    print(f"Data Loading completed in {end_time_load - start_time_load:.2f} seconds.")
 
     # 2. Harmonize and Combine Datasets
+    start_time_harmonize = time.time()
     combined_df = None
     if df_synthetic is not None and df_uci is not None:
         df_synthetic_harmonized, df_uci_harmonized = harmonize_datasets(df_synthetic, df_uci)
@@ -386,12 +394,18 @@ if __name__ == "__main__":
             # This is crucial because the UCI dataset has 0-4 values for heart_disease
             combined_df[TARGET_COLUMN] = (combined_df[TARGET_COLUMN] > 0).astype(int)
             print(f"Binarized '{TARGET_COLUMN}': values > 0 converted to 1.")
+    end_time_harmonize = time.time()
+    print(f"Data Harmonization and Combination completed in {end_time_harmonize - start_time_harmonize:.2f} seconds.")
 
     # 3. Perform EDA on Combined Dataset
+    start_time_eda = time.time()
     if combined_df is not None:
         perform_eda(combined_df, "Combined Dataset", ALL_NUMERICAL_FEATURES, ALL_CATEGORICAL_FEATURES)
+    end_time_eda = time.time()
+    print(f"EDA completed in {end_time_eda - start_time_eda:.2f} seconds.")
 
     # 4. Preprocess Combined Data
+    start_time_preprocess = time.time()
     # Exclude 'source' column from features for modeling
     features_for_modeling_numerical = ALL_NUMERICAL_FEATURES
     features_for_modeling_categorical = ALL_CATEGORICAL_FEATURES + ['source'] # Add source to categorical for preprocessing
@@ -399,8 +413,11 @@ if __name__ == "__main__":
     X_combined, y_combined, preprocessor_combined = preprocess_data(
         combined_df, TARGET_COLUMN, features_for_modeling_categorical, features_for_modeling_numerical
     )
+    end_time_preprocess = time.time()
+    print(f"Data Preprocessing completed in {end_time_preprocess - start_time_preprocess:.2f} seconds.")
 
     # 5. Train and Evaluate Models on Combined Data
+    start_time_train = time.time()
     if X_combined is not None:
         # Define parameter grids for GridSearchCV
         param_grid_lr = {
@@ -426,31 +443,59 @@ if __name__ == "__main__":
         }
 
         # Logistic Regression with GridSearchCV
+        start_time_lr = time.time()
         lr_model_combined, lr_y_pred_combined, lr_y_proba_combined, lr_metrics_combined = train_evaluate_model(
             X_combined, y_combined, preprocessor_combined, model_type='logistic_regression', param_grid=param_grid_lr
         )
+        end_time_lr = time.time()
+        print(f"Logistic Regression training and evaluation completed in {end_time_lr - start_time_lr:.2f} seconds.")
 
         # Random Forest with GridSearchCV
+        start_time_rf = time.time()
         rf_model_combined, rf_y_pred_combined, rf_y_proba_combined, rf_metrics_combined = train_evaluate_model(
             X_combined, y_combined, preprocessor_combined, model_type='random_forest', param_grid=param_grid_rf
         )
+        end_time_rf = time.time()
+        print(f"Random Forest training and evaluation completed in {end_time_rf - start_time_rf:.2f} seconds.")
 
         # XGBoost with GridSearchCV
+        start_time_xgb = time.time()
         xgb_model_combined, xgb_y_pred_combined, xgb_y_proba_combined, xgb_metrics_combined = train_evaluate_model(
             X_combined, y_combined, preprocessor_combined, model_type='xgboost', param_grid=param_grid_xgb
         )
+        end_time_xgb = time.time()
+        print(f"XGBoost training and evaluation completed in {end_time_xgb - start_time_xgb:.2f} seconds.")
 
-        # 6. Model Interpretability (for Random Forest on Combined Data)
-        # Note: XGBoost also has feature importances, but accessing them is similar to RF.
-        if rf_model_combined is not None:
-            rf_feature_importances_combined = interpret_model(
-                rf_model_combined, preprocessor_combined, features_for_modeling_numerical, features_for_modeling_categorical
-            )
+    end_time_train = time.time()
+    print(f"Model Training and Evaluation completed in {end_time_train - start_time_train:.2f} seconds.")
 
-        # You can also interpret XGBoost model if needed
-        # if xgb_model_combined is not None:
-        #     xgb_feature_importances_combined = interpret_model(
-        #         xgb_model_combined, preprocessor_combined, features_for_modeling_numerical, features_for_modeling_categorical
-        #     )
+    # 6. Model Interpretability (for Random Forest on Combined Data)
+    start_time_interpret = time.time()
+    # Note: XGBoost also has feature importances, but accessing them is similar to RF.
+    if rf_model_combined is not None:
+        rf_feature_importances_combined = interpret_model(
+            rf_model_combined, preprocessor_combined, features_for_modeling_numerical, features_for_modeling_categorical
+        )
 
-    print("\n--- Analysis Complete on Combined Dataset ---")
+    # You can also interpret XGBoost model if needed
+    # if xgb_model_combined is not None:
+    #     xgb_feature_importances_combined = interpret_model(
+    #         xgb_model_combined, preprocessor_combined, features_for_modeling_numerical, features_for_modeling_categorical
+    #     )
+    end_time_interpret = time.time()
+    print(f"Model Interpretability completed in {end_time_interpret - start_time_interpret:.2f} seconds.")
+
+    end_time_total = time.time()
+    print(f"\n--- Analysis Complete on Combined Dataset --- Total time: {end_time_total - start_time_total:.2f} seconds.")
+    print("\nRecommendations for further speed improvement:")
+    print("1. GridSearchCV: The most time-consuming part is often hyperparameter tuning with GridSearchCV.")
+    print("   - Reduce the size of parameter grids (fewer values per parameter).")
+    print("   - Reduce the 'cv' (cross-validation) folds.")
+    print("   - Consider RandomizedSearchCV instead of GridSearchCV for large search spaces.")
+    print("2. Data Size: For very large datasets, consider sampling or using distributed computing frameworks (e.g., Dask).")
+    print("3. Feature Engineering/Selection: Reduce the number of features if many are redundant or irrelevant.")
+    print("4. Progress Bars: For long-running loops or processes, consider using 'tqdm' for visual progress indication.")
+    print("   (e.g., 'from tqdm import tqdm' and wrap iterables like 'for item in tqdm(my_list):')")
+    print("   However, integrating tqdm directly into GridSearchCV's internal process is more complex.")
+    print("5. Caching: If you run the script multiple times with the same data, save preprocessed data (X, y) to disk.")
+    print("   (e.g., using joblib.dump and joblib.load) to avoid re-running preprocessing.")
