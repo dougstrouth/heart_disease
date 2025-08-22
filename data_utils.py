@@ -22,7 +22,7 @@ def load_data(file_path):
     """
     try:
         if DASK_TYPE == 'coiled':
-            df = dd.read_csv(file_path)
+            df = dd.read_csv(file_path, dtype={'cp': 'object', 'restecg': 'object', 'sex': 'object', 'slope': 'object'})
             logger.info(f"Successfully loaded Dask DataFrame from {file_path}")
         else:
             df = pd.read_csv(file_path)

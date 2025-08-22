@@ -4,6 +4,12 @@ import pandas as pd
 import numpy as np
 import logging
 import dask.dataframe as dd
+import mlflow # Added for MLflow integration
+
+# Define MLflow Tracking and Artifact URIs
+# For local tracking, use a file URI. For GCS artifact storage, use gs://
+MLFLOW_TRACKING_URI = "file:///Users/dougstrouth/Library/Mobile Documents/com~apple~CloudDocs/Documents/GitHub/heart_disease/mlruns"
+MLFLOW_ARTIFACT_URI = "gs://my-heart-disease-data-bucket/mlflow-artifacts"
 
 from config import SHOW_PLOTS, VERBOSE_OUTPUT, DASK_TYPE, RUN_STACKED_ENSEMBLE, META_CLASSIFIER, CV_FOLDS
 from dask_utils import get_dask_client
@@ -26,64 +32,55 @@ def run_data_pipeline(verbose_output, show_plots):
     logger = logging.getLogger('heart_disease_analysis')
     logger.info("\n--- Data Pipeline ---")
     start_time_load = time.time()
-    combined_df = load_data('gs://my-heart-disease-data-bucket/data/combined_heart_disease_dataset.csv')
-    logger.info(f"Data Loading completed in {time.time() - start_time_load:.2f} seconds.")
 
-    start_time_harmonize = time.time()
-    # No harmonization needed as data is already combined and cleaned
-    if combined_df is not None:
-        # Ensure target column is binarized and categorical features are handled if not already
-        # This part might need to be adjusted based on how 'combined_heart_disease_dataset.csv' was saved
-        # and if it retains Dask DataFrame properties or is a simple CSV.
-        # Assuming it's a clean CSV, we might need to re-apply some cleaning steps if not already done.
-        # For now, we'll assume the saved CSV is ready for direct use.
-        # If it's a Dask DataFrame, we might need to compute it if subsequent steps expect pandas.
-        # For simplicity, we'll assume load_data returns a Dask DataFrame if DASK_TYPE is coiled.
-        is_dask = isinstance(combined_df, dd.DataFrame)
-        if is_dask:
-            # If it's a Dask DataFrame, ensure it's computed if subsequent steps expect pandas
-            # or if operations like .dropna() need to be triggered.
-            # For now, we'll rely on Dask-ML to handle Dask DataFrames.
-            pass
+    if DASK_TYPE == 'local':
+        # Load and combine individual local datasets
+        df_pratyushpuri = load_data('unified_heart_disease_dataset.csv')
+        df_edwankarimsony = load_data('/Users/dougstrouth/Documents/datasets/kaggle_data_sets/data/edwankarimsony/heart-disease-data/heart_disease_uci.csv')
+        df_johnsmith88 = load_data('/Users/dougstrouth/Documents/datasets/kaggle_data_sets/data/johnsmith88/heart-disease-data/heart.csv')
+
+        logger.info(f"Data Loading completed in {time.time() - start_time_load:.2f} seconds.")
+
+        start_time_harmonize = time.time()
+        # Rename 'target' column to 'heart_disease' in df_johnsmith88 for harmonization
+        if df_johnsmith88 is not None and 'target' in df_johnsmith88.columns:
+            df_johnsmith88 = df_johnsmith88.rename(columns={'target': 'heart_disease'})
+
+        # Harmonize and combine the first two datasets
+        combined_df_initial = combine_and_clean_data(df_pratyushpuri, df_edwankarimsony, verbose_output=verbose_output)
+
+        # Harmonize the third dataset and combine with the initial combined_df
+        if combined_df_initial is not None and df_johnsmith88 is not None:
+            combined_df = combine_and_clean_data(combined_df_initial, df_johnsmith88, verbose_output=verbose_output)
         else:
-            # If it's a pandas DataFrame, ensure it's cleaned
-            initial_rows = len(combined_df)
-            combined_df.dropna(subset=[TARGET_COLUMN], inplace=True)
-            rows_after_dropna = len(combined_df)
-            logger.info(f"Dropped {initial_rows - rows_after_dropna} rows with NaN in '{TARGET_COLUMN}'.")
-            logger.info(f"Combined dataset now has {rows_after_dropna} rows.")
+            combined_df = None # Handle cases where initial combination failed or third df is None
 
-            for col in CATEGORICAL_FEATURES:
-                if col in combined_df.columns:
-                    combined_df[col] = combined_df[col].astype(str)
-                    combined_df[col] = combined_df[col].fillna('missing')
-                    if verbose_output: logger.info(f"Converted '{col}' to string and filled NaNs.")
+        logger.info(f"Data Harmonization and Combination completed in {time.time() - start_time_harmonize:.2f} seconds.")
 
-            for col in BINARY_FEATURES:
-                if col in combined_df.columns:
-                    combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce')
-                    combined_df[col] = combined_df[col].fillna(0) # Fill NaNs with 0 for binary features
-                    if verbose_output: logger.info(f"Filled NaNs in binary feature '{col}' with 0.")
+        # Perform EDA and save combined file locally
+        if combined_df is not None:
+            perform_eda(combined_df, "Combined Dataset", NUMERICAL_FEATURES, CATEGORICAL_FEATURES, show_plots=show_plots, verbose_output=verbose_output)
 
-            combined_df[TARGET_COLUMN] = combined_df[TARGET_COLUMN].astype(int)
-            combined_df[TARGET_COLUMN] = (combined_df[TARGET_COLUMN] > 0).astype(int)
-            if verbose_output: logger.info(f"Binarized '{TARGET_COLUMN}': values > 0 converted to 1.")
+            output_csv_path = "combined_heart_disease_dataset.csv"
+            if isinstance(combined_df, pd.DataFrame):
+                combined_df.to_csv(output_csv_path, index=False)
+                logger.info(f"Combined dataset saved to {output_csv_path}")
+            else: # Assuming it's a Dask DataFrame
+                combined_df.to_csv(output_csv_path, index=False, single_file=True)
+                logger.info(f"Combined Dask dataset saved to {output_csv_path}")
 
-    logger.info(f"Data Harmonization and Combination completed in {time.time() - start_time_harmonize:.2f} seconds.")
+    else:
+        # Load pre-combined dataset from GCS for Coiled runs
+        combined_df = load_data('gs://my-heart-disease-data-bucket/data/combined_heart_disease_dataset.csv')
+        logger.info(f"Data Loading completed in {time.time() - start_time_load:.2f} seconds.")
 
-    if combined_df is not None:
-        perform_eda(combined_df, "Combined Dataset", NUMERICAL_FEATURES, CATEGORICAL_FEATURES, show_plots=show_plots, verbose_output=verbose_output)
-
-        # Save the combined DataFrame to a CSV file
-        output_csv_path = "combined_heart_disease_dataset.csv"
-        if isinstance(combined_df, pd.DataFrame):
-            combined_df.to_csv(output_csv_path, index=False)
-            logger.info(f"Combined dataset saved to {output_csv_path}")
-        else: # Assuming it's a Dask DataFrame
-            combined_df.to_csv(output_csv_path, index=False, single_file=True)
-            logger.info(f"Combined Dask dataset saved to {output_csv_path}")
+        # Perform EDA (no saving needed as it's already in GCS)
+        if combined_df is not None:
+            perform_eda(combined_df, "Combined Dataset", NUMERICAL_FEATURES, CATEGORICAL_FEATURES, show_plots=show_plots, verbose_output=verbose_output)
 
     return combined_df
+
+
 
 def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ensemble, meta_classifier):
     logger = logging.getLogger('heart_disease_analysis')
@@ -222,7 +219,7 @@ def log_analysis_results(start_time, dask_type, lr_metrics, rf_metrics, xgb_metr
 
     log_run_results(run_details)
 
-def main():
+def run_analysis():
     start_time_total = time.time()
     logger = setup_logging()
     logger.info("\n--- Starting Heart Disease Analysis ---")
@@ -249,6 +246,20 @@ def main():
 
             log_analysis_results(start_time_total, DASK_TYPE, lr_metrics, rf_metrics, xgb_metrics, stacked_metrics, RUN_STACKED_ENSEMBLE, lr_cv_mean, lr_cv_std, rf_cv_mean, rf_cv_std, xgb_cv_mean, xgb_cv_std, stacked_cv_mean, stacked_cv_std)
 
+            # MLflow Logging
+            mlflow.log_metric("lr_cv_roc_auc", lr_cv_mean)
+            mlflow.log_metric("rf_cv_roc_auc", rf_cv_mean)
+            mlflow.log_metric("xgb_cv_roc_auc", xgb_cv_mean)
+            if RUN_STACKED_ENSEMBLE and stacked_cv_mean is not None:
+                mlflow.log_metric("stacked_cv_roc_auc", stacked_cv_mean)
+
+            # Log models
+            mlflow.sklearn.log_model(lr_model, "logistic_regression_model")
+            mlflow.sklearn.log_model(rf_model, "random_forest_model")
+            mlflow.xgboost.log_model(xgb_model, "xgboost_model") # Use mlflow.xgboost for XGBoost models
+            if RUN_STACKED_ENSEMBLE and stacked_model is not None:
+                mlflow.sklearn.log_model(stacked_model, "stacked_ensemble_model")
+
     finally:
         if dask_client:
             logger.info("Closing Dask client...")
@@ -257,5 +268,17 @@ def main():
 
     logger.info(f"\n--- Analysis Complete --- Total time: {time.time() - start_time_total:.2f} seconds.")
 
+def main():
+    run_analysis() # Call the refactored analysis function
+
+
 if __name__ == "__main__":
-    main()
+    # Set MLflow tracking URI
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment("Heart Disease Prediction")
+
+    with mlflow.start_run():
+        # Log Dask type as a parameter
+        mlflow.log_param("dask_type", DASK_TYPE)
+
+        main()

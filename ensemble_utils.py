@@ -6,6 +6,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from dask.distributed import Client
 from typing import Optional
 import logging
+import mlflow # Added for MLflow integration
 
 def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, meta_classifier, dask_client: Optional[Client] = None, n_splits_skf=5):
     logger = logging.getLogger('heart_disease_analysis')
@@ -79,6 +80,13 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
     logger.info("\nClassification Report:")
     logger.info(classification_report(y_test, y_pred_stacked)) # Print readable format
 
+    # MLflow: Log stacked model evaluation metrics
+    mlflow.log_metric("stacked_accuracy", accuracy)
+    mlflow.log_metric("stacked_precision", precision)
+    mlflow.log_metric("stacked_recall", recall)
+    mlflow.log_metric("stacked_f1_score", f1)
+    mlflow.log_metric("stacked_roc_auc", roc_auc)
+
     metrics = {
         'accuracy': accuracy,
         'precision': precision,
@@ -90,3 +98,4 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
     }
 
     return meta_classifier, y_pred_stacked, y_proba_stacked, metrics
+
