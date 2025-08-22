@@ -1,9 +1,4 @@
-# To install xgboost: pip install xgboost
-
 import warnings
-# Suppress the specific FutureWarning from scikit-learn's ColumnTransformer
-warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn.compose._column_transformer")
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,7 +6,8 @@ import seaborn as sns
 import time
 import joblib
 import os
-from tqdm import tqdm # For progress bars
+from typing import Optional # Import Optional
+from dask.distributed import Client # Import Client for type hinting
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -23,6 +19,9 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.impute import SimpleImputer
 from xgboost import XGBClassifier # Import XGBClassifier
 from dask_utils import get_dask_client # Import Dask utility function
+
+# Suppress the specific FutureWarning from scikit-learn's ColumnTransformer
+warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn.compose._column_transformer")
 
 # --- Configuration ---
 SHOW_PLOTS = False  # Set to True to display plots, False to suppress them
@@ -72,7 +71,8 @@ def harmonize_datasets(df_synthetic, df_uci):
         print("Cannot harmonize: One or both DataFrames are None.")
         return None
 
-    if VERBOSE_OUTPUT: print("\n--- Harmonizing Datasets ---")
+    if VERBOSE_OUTPUT:
+        print("\n--- Harmonizing Datasets ---")
 
     # Make copies to avoid modifying original DataFrames
     df_synthetic_harmonized = df_synthetic.copy()
@@ -82,12 +82,14 @@ def harmonize_datasets(df_synthetic, df_uci):
     # Correcting 'thalch' to 'thalach'
     if 'thalch' in df_uci_harmonized.columns:
         df_uci_harmonized.rename(columns={'thalch': 'thalach'}, inplace=True)
-        if VERBOSE_OUTPUT: print("Renamed 'thalch' to 'thalach' in UCI dataset.")
+        if VERBOSE_OUTPUT:
+            print("Renamed 'thalch' to 'thalach' in UCI dataset.")
 
     # Correcting target column from 'num' to 'heart_disease'
     if 'num' in df_uci_harmonized.columns:
         df_uci_harmonized.rename(columns={'num': 'heart_disease'}, inplace=True)
-        if VERBOSE_OUTPUT: print("Renamed 'num' to 'heart_disease' in UCI dataset.")
+        if VERBOSE_OUTPUT:
+            print("Renamed 'num' to 'heart_disease' in UCI dataset.")
 
     # 2. Re-encode 'thal' column in UCI dataset
     # Synthetic thal: 3=normal, 6=fixed defect, 7=reversible defect
@@ -99,22 +101,26 @@ def harmonize_datasets(df_synthetic, df_uci):
         # Map values to synthetic dataset's encoding. Values not in mapping become NaN.
         df_uci_harmonized['thal'] = df_uci_harmonized['thal'].map(thal_mapping_uci_to_synthetic)
         # NaNs introduced here (from coercion or unmapped values) will be handled by the SimpleImputer in preprocessing.
-        if VERBOSE_OUTPUT: print("Re-encoded 'thal' column in UCI dataset and handled unmapped values.")
+        if VERBOSE_OUTPUT:
+            print("Re-encoded 'thal' column in UCI dataset and handled unmapped values.")
 
     # 3. Add 'source' column to both datasets
     if 'source' not in df_synthetic_harmonized.columns:
         df_synthetic_harmonized['source'] = 'Synthetic' # Assuming original synthetic data doesn't have it
-    if VERBOSE_OUTPUT: print("Ensured 'source' column in synthetic dataset.")
+    if VERBOSE_OUTPUT:
+        print("Ensured 'source' column in synthetic dataset.")
 
     df_uci_harmonized['source'] = 'UCI'
-    if VERBOSE_OUTPUT: print("Added 'source' column to UCI dataset.")
+    if VERBOSE_OUTPUT:
+        print("Added 'source' column to UCI dataset.")
 
     # 4. Handle features unique to synthetic dataset: 'smoking', 'diabetes', 'bmi'
     unique_synthetic_features = ['smoking', 'diabetes', 'bmi']
     for feature in unique_synthetic_features:
         if feature not in df_uci_harmonized.columns:
             df_uci_harmonized[feature] = 0  # Impute with 0
-            if VERBOSE_OUTPUT: print(f"Added and imputed '{feature}' with 0 for UCI dataset.")
+            if VERBOSE_OUTPUT:
+                print(f"Added and imputed '{feature}' with 0 for UCI dataset.")
 
     # Ensure both dataframes have the exact same columns in the same order before concatenation
     # Get all columns from the synthetic dataset (which now includes 'source' and original unique features)
@@ -123,7 +129,8 @@ def harmonize_datasets(df_synthetic, df_uci):
     # Reorder UCI columns to match synthetic dataset's column order
     df_uci_harmonized = df_uci_harmonized[final_columns].copy()
 
-    if VERBOSE_OUTPUT: print("Datasets harmonized successfully. Ready for concatenation.")
+    if VERBOSE_OUTPUT:
+        print("Datasets harmonized successfully. Ready for concatenation.")
     return df_synthetic_harmonized, df_uci_harmonized
 
 # --- Exploratory Data Analysis (EDA) Function ---
@@ -218,14 +225,12 @@ def preprocess_data(df, target_column, categorical_features, numerical_features)
             ('cat', categorical_transformer, [f for f in categorical_features if f in features_for_preprocessing])
         ])
 
-    if VERBOSE_OUTPUT: print("\nPreprocessing setup complete.")
+    if VERBOSE_OUTPUT:
+        print("\nPreprocessing setup complete.")
     return X, y, preprocessor
 
 # --- Model Training and Evaluation Function ---
-from dask.distributed import Client # Import Client for type hinting
-from dask_ml.model_selection import GridSearchCV as DaskGridSearchCV # Import Dask-ML GridSearchCV
-
-def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression', param_grid=None, dask_client: Client = None):
+def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression', param_grid=None, dask_client: Optional[Client] = None):
     """
     Trains and evaluates a specified machine learning model.
     If param_grid is provided, performs GridSearchCV for hyperparameter tuning.
@@ -235,7 +240,8 @@ def train_evaluate_model(X, y, preprocessor, model_type='logistic_regression', p
         return None, None, None
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    if VERBOSE_OUTPUT: print("\nData split into training and testing sets.")
+    if VERBOSE_OUTPUT:
+        print("\nData split into training and testing sets.")
 
     if model_type == 'logistic_regression':
         classifier = LogisticRegression(solver='liblinear', random_state=42, max_iter=1000)
@@ -440,18 +446,21 @@ if __name__ == "__main__":
                         combined_df[col] = combined_df[col].astype(str)
                         # Fill any NaNs that might have resulted from coercion or were already present
                         combined_df[col] = combined_df[col].fillna('missing')
-                        if VERBOSE_OUTPUT: print(f"Converted '{col}' to string and filled NaNs.")
+                        if VERBOSE_OUTPUT:
+                            print(f"Converted '{col}' to string and filled NaNs.")
 
                 # Ensure heart_disease is integer type for classification.
                 # The UCI dataset has values 0, 1, 2, 3, 4 for heart_disease.
                 # For binary classification, these are binarized (0 = no disease, >0 = disease).
                 combined_df[TARGET_COLUMN] = combined_df[TARGET_COLUMN].astype(int)
-                if VERBOSE_OUTPUT: print(f"Converted '{TARGET_COLUMN}' to integer type.")
+                if VERBOSE_OUTPUT:
+                    print(f"Converted '{TARGET_COLUMN}' to integer type.")
 
                 # Binarize the target variable: 0 = no disease, >0 = disease.
                 # This is crucial because the UCI dataset has 0-4 values for heart_disease.
                 combined_df[TARGET_COLUMN] = (combined_df[TARGET_COLUMN] > 0).astype(int)
-                if VERBOSE_OUTPUT: print(f"Binarized '{TARGET_COLUMN}': values > 0 converted to 1.")
+                if VERBOSE_OUTPUT:
+                    print(f"Binarized '{TARGET_COLUMN}': values > 0 converted to 1.")
         end_time_harmonize = time.time()
         print(f"Data Harmonization and Combination completed in {end_time_harmonize - start_time_harmonize:.2f} seconds.")
 

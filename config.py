@@ -19,16 +19,16 @@ RUN_PARAMETER_SEARCH = True   # Set to True to run the automated parameter searc
 
 # Define parameter options to iterate through for automated search
 LR_C_OPTIONS = [0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0]
-RF_N_ESTIMATORS_OPTIONS = [100, 200, 300, 400, 500, 750, 1000]
-RF_MAX_DEPTH_OPTIONS = [5, 10, 15, 20, 25, 30, 40, 50, None]
-RF_MIN_SAMPLES_SPLIT_OPTIONS = [2, 5, 10, 20, 50]
-RF_MIN_SAMPLES_LEAF_OPTIONS = [1, 2, 4, 8, 16]
-XGB_N_ESTIMATORS_OPTIONS = [50, 100, 200, 300, 400, 500, 750, 1000]
-XGB_LEARNING_RATE_OPTIONS = [0.001, 0.005, 0.01, 0.05, 0.1, 0.2, 0.3, 0.5]
+RF_N_ESTIMATORS_OPTIONS = [100]
+RF_MAX_DEPTH_OPTIONS = [10]
+RF_MIN_SAMPLES_SPLIT_OPTIONS = [2]
+RF_MIN_SAMPLES_LEAF_OPTIONS = [1]
+XGB_N_ESTIMATORS_OPTIONS = [100]
+XGB_LEARNING_RATE_OPTIONS = [0.1]
 
-RF_RANDOM_SEARCH_N_ITER = 200 # Number of iterations for RandomizedSearchCV for Random Forest
+RF_RANDOM_SEARCH_N_ITER = 5 # Number of iterations for RandomizedSearchCV for Random Forest
 LR_RANDOM_SEARCH_N_ITER = 50 # Number of iterations for RandomizedSearchCV for Logistic Regression
-XGB_RANDOM_SEARCH_N_ITER = 100 # Number of iterations for RandomizedSearchCV for XGBoost
+XGB_RANDOM_SEARCH_N_ITER = 5 # Number of iterations for RandomizedSearchCV for XGBoost
 
 CV_FOLDS = 5 # Number of cross-validation folds for GridSearchCV/RandomizedSearchCV
 

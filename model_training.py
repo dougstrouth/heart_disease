@@ -1,16 +1,12 @@
-import time
 import joblib
-import os
 from typing import Optional, Any
 import logging
 
-import pandas as pd
-import numpy as np
 import mlflow
 import mlflow.sklearn
 import mlflow.xgboost # Import for XGBoost models
 
-from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -20,10 +16,10 @@ from xgboost import XGBClassifier
 from dask.distributed import Client
 
 # Import configuration options
-from config import LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, RF_MIN_SAMPLES_SPLIT_OPTIONS, RF_MIN_SAMPLES_LEAF_OPTIONS, XGB_N_ESTIMATORS_OPTIONS, XGB_LEARNING_RATE_OPTIONS, RF_RANDOM_SEARCH_N_ITER, LR_RANDOM_SEARCH_N_ITER, XGB_RANDOM_SEARCH_N_ITER, CV_FOLDS, RUN_STACKED_ENSEMBLE, META_CLASSIFIER
+from config import RF_RANDOM_SEARCH_N_ITER, LR_RANDOM_SEARCH_N_ITER, XGB_RANDOM_SEARCH_N_ITER, CV_FOLDS
+from preprocessing import get_feature_names
 
 # Import stacking utility
-from ensemble_utils import train_stacked_model
 
 def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_test_processed, model_type='logistic_regression', param_grid=None, dask_client: Optional[Client] = None):
     logger = logging.getLogger('heart_disease_analysis')

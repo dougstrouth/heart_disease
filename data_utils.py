@@ -47,7 +47,8 @@ def harmonize_datasets(df_synthetic, df_uci, verbose_output=False):
         logger.error("Cannot harmonize: One or both DataFrames are None.")
         return None
 
-    if verbose_output: logger.info("\n--- Harmonizing Datasets ---")
+    if verbose_output:
+        logger.info("\n--- Harmonizing Datasets ---")
 
     # Determine if we are working with Dask or Pandas DataFrames
     is_dask = isinstance(df_synthetic, dd.DataFrame)
@@ -60,11 +61,13 @@ def harmonize_datasets(df_synthetic, df_uci, verbose_output=False):
 
     if 'thalch' in df_uci_harmonized.columns:
         df_uci_harmonized = df_uci_harmonized.rename(columns={'thalch': 'thalach'})
-        if verbose_output: logger.info("Renamed 'thalch' to 'thalach' in UCI dataset.")
+        if verbose_output:
+            logger.info("Renamed 'thalch' to 'thalach' in UCI dataset.")
 
     if 'num' in df_uci_harmonized.columns:
         df_uci_harmonized = df_uci_harmonized.rename(columns={'num': 'heart_disease'})
-        if verbose_output: logger.info("Renamed 'num' to 'heart_disease' in UCI dataset.")
+        if verbose_output:
+            logger.info("Renamed 'num' to 'heart_disease' in UCI dataset.")
 
     thal_mapping_uci_to_synthetic = {0: 3, 1: 6, 2: 7}
     if 'thal' in df_uci_harmonized.columns:
@@ -74,20 +77,23 @@ def harmonize_datasets(df_synthetic, df_uci, verbose_output=False):
         else:
             df_uci_harmonized['thal'] = pd.to_numeric(df_uci_harmonized['thal'], errors='coerce')
             df_uci_harmonized['thal'] = df_uci_harmonized['thal'].map(thal_mapping_uci_to_synthetic)
-        if verbose_output: logger.info("Re-encoded 'thal' column in UCI dataset and handled unmapped values.")
+        if verbose_output:
+            logger.info("Re-encoded 'thal' column in UCI dataset and handled unmapped values.")
 
     if 'source' not in df_synthetic_harmonized.columns:
         if is_dask:
             df_synthetic_harmonized['source'] = 'Synthetic' # Dask will broadcast this
         else:
             df_synthetic_harmonized['source'] = 'Synthetic'
-    if verbose_output: logger.info("Ensured 'source' column in synthetic dataset.")
+    if verbose_output:
+        logger.info("Ensured 'source' column in synthetic dataset.")
 
     if is_dask:
         df_uci_harmonized['source'] = 'UCI' # Dask will broadcast this
     else:
         df_uci_harmonized['source'] = 'UCI'
-    if verbose_output: logger.info("Added 'source' column to UCI dataset.")
+    if verbose_output:
+        logger.info("Added 'source' column to UCI dataset.")
 
     unique_synthetic_features = ['smoking', 'diabetes', 'bmi']
     for feature in unique_synthetic_features:
@@ -96,7 +102,8 @@ def harmonize_datasets(df_synthetic, df_uci, verbose_output=False):
                 df_uci_harmonized[feature] = 0 # Dask will broadcast this
             else:
                 df_uci_harmonized[feature] = 0
-            if verbose_output: logger.info(f"Added and imputed '{feature}' with 0 for UCI dataset.")
+            if verbose_output:
+                logger.info(f"Added and imputed '{feature}' with 0 for UCI dataset.")
 
     # Define the expected final set of columns based on the overall schema
     expected_final_columns = list(set(NUMERICAL_FEATURES + CATEGORICAL_FEATURES + BINARY_FEATURES + [TARGET_COLUMN, 'source']))
@@ -129,7 +136,8 @@ def harmonize_datasets(df_synthetic, df_uci, verbose_output=False):
     logger.debug(f"df_synthetic_harmonized dtypes after harmonization:\n{df_synthetic_harmonized.dtypes}")
     logger.debug(f"df_uci_harmonized dtypes after harmonization:\n{df_uci_harmonized.dtypes}")
 
-    if verbose_output: logger.info("Datasets harmonized successfully. Ready for concatenation.")
+    if verbose_output:
+        logger.info("Datasets harmonized successfully. Ready for concatenation.")
     return df_synthetic_harmonized, df_uci_harmonized
 
 def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
@@ -146,7 +154,7 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
 
     if is_dask:
         combined_df = dd.concat([df_synthetic_harmonized, df_uci_harmonized], ignore_index=True)
-        logger.info(f"Combined Dask dataset created.")
+        logger.info("Combined Dask dataset created.")
     else:
         combined_df = pd.concat([df_synthetic_harmonized, df_uci_harmonized], ignore_index=True)
         logger.info(f"Combined pandas dataset created with {len(combined_df)} rows.")
@@ -174,7 +182,8 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
             else:
                 combined_df[col] = combined_df[col].astype(str)
                 combined_df[col] = combined_df[col].fillna('missing')
-            if verbose_output: logger.info(f"Converted '{col}' to string and filled NaNs.")
+            if verbose_output:
+                logger.info(f"Converted '{col}' to string and filled NaNs.")
 
     for col in BINARY_FEATURES:
         if col in combined_df.columns:
@@ -185,7 +194,8 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
             else:
                 combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce')
                 combined_df[col] = combined_df[col].fillna(0) # Fill NaNs with 0 for binary features
-            if verbose_output: logger.info(f"Filled NaNs in binary feature '{col}' with 0.")
+            if verbose_output:
+                logger.info(f"Filled NaNs in binary feature '{col}' with 0.")
 
     for col in NUMERICAL_FEATURES:
         if col in combined_df.columns:
@@ -193,7 +203,8 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
                 combined_df[col] = dd.to_numeric(combined_df[col], errors='coerce')
             else:
                 combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce')
-            if verbose_output: logger.info(f"Coerced '{col}' to numeric, converting errors to NaN.")
+            if verbose_output:
+                logger.info(f"Coerced '{col}' to numeric, converting errors to NaN.")
 
     if is_dask:
         # For Dask, ensure target column is computed and binarized
@@ -202,7 +213,8 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
     else:
         combined_df[TARGET_COLUMN] = combined_df[TARGET_COLUMN].astype(int)
         combined_df[TARGET_COLUMN] = (combined_df[TARGET_COLUMN] > 0).astype(int)
-    if verbose_output: logger.info(f"Binarized '{TARGET_COLUMN}': values > 0 converted to 1.")
+    if verbose_output:
+        logger.info(f"Binarized '{TARGET_COLUMN}': values > 0 converted to 1.")
 
     logger.debug(f"Combined_df head after cleaning:\n{combined_df.head()}")
     logger.debug(f"Combined_df dtypes after cleaning:\n{combined_df.dtypes}")
@@ -314,13 +326,16 @@ def preprocess_data(df, preprocessor, target_column, cache_dir="cache", use_cach
     y_cache_path = os.path.join(cache_dir, "y_processed.joblib")
 
     if use_cache and os.path.exists(X_cache_path) and os.path.exists(y_cache_path):
-        if verbose_output: logger.info("\nLoading preprocessed data from cache...")
+        if verbose_output:
+            logger.info("\nLoading preprocessed data from cache...")
         X_processed = joblib.load(X_cache_path)
         y_processed = joblib.load(y_cache_path)
-        if verbose_output: logger.info("Preprocessed data loaded from cache.")
+        if verbose_output:
+            logger.info("Preprocessed data loaded from cache.")
         return X_processed, y_processed
 
-    if verbose_output: logger.info("\nPreprocessing data...")
+    if verbose_output:
+        logger.info("\nPreprocessing data...")
     
     # Debugging: Check for NaNs before preprocessing
     if is_dask:
@@ -343,6 +358,7 @@ def preprocess_data(df, preprocessor, target_column, cache_dir="cache", use_cach
         else:
             joblib.dump(X_processed, X_cache_path)
             joblib.dump(y, y_cache_path)
-        if verbose_output: logger.info("Preprocessed data saved to cache.")
+        if verbose_output:
+            logger.info("Preprocessed data saved to cache.")
 
     return X_processed, y

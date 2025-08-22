@@ -1,34 +1,28 @@
-import warnings
+# test
 import time
+import logging
+import joblib
 import pandas as pd
 import numpy as np
-import logging
-import dask.dataframe as dd
-import mlflow # Added for MLflow integration
+import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
-
-# Define MLflow Tracking and Artifact URIs
-# For local tracking, use a file URI. For GCS artifact storage, use gs://
-MLFLOW_TRACKING_URI = "file:///Users/dougstrouth/Library/Mobile Documents/com~apple~CloudDocs/Documents/GitHub/heart_disease/mlruns"
-MLFLOW_ARTIFACT_URI = "gs://my-heart-disease-data-bucket/mlflow-artifacts"
+from sklearn.model_selection import train_test_split, cross_val_score
 
 from config import SHOW_PLOTS, VERBOSE_OUTPUT, DASK_TYPE, RUN_STACKED_ENSEMBLE, META_CLASSIFIER, CV_FOLDS, LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, RF_MIN_SAMPLES_SPLIT_OPTIONS, RF_MIN_SAMPLES_LEAF_OPTIONS, XGB_N_ESTIMATORS_OPTIONS, XGB_LEARNING_RATE_OPTIONS
 from dask_utils import get_dask_client
-from data_utils import load_data, combine_and_clean_data, perform_eda, preprocess_data, TARGET_COLUMN, NUMERICAL_FEATURES, CATEGORICAL_FEATURES, BINARY_FEATURES
-from model_training import train_evaluate_model, train_stacked_model
+from data_utils import load_data, combine_and_clean_data, perform_eda, TARGET_COLUMN, NUMERICAL_FEATURES, CATEGORICAL_FEATURES, BINARY_FEATURES
+from model_training import train_evaluate_model
+from ensemble_utils import train_stacked_model
 from model_interpretation import interpret_model
 from preprocessing import get_preprocessor, get_feature_names
 from utils.logging_utils import log_run_results
 from utils.logger_config import setup_logging
 
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
-
-import joblib
+# Define MLflow Tracking and Artifact URIs
+# For local tracking, use a file URI. For GCS artifact storage, use gs://
+MLFLOW_TRACKING_URI = "file:///Users/dougstrouth/Library/Mobile Documents/com~apple~CloudDocs/Documents/GitHub/heart_disease/mlruns"
+MLFLOW_ARTIFACT_URI = "gs://my-heart-disease-data-bucket/mlflow-artifacts"
 
 def run_data_pipeline(verbose_output, show_plots):
     logger = logging.getLogger('heart_disease_analysis')
@@ -83,7 +77,6 @@ def run_data_pipeline(verbose_output, show_plots):
     return combined_df
 
 
-
 def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ensemble, meta_classifier):
     logger = logging.getLogger('heart_disease_analysis')
     logger.info("\n--- Model Training, Evaluation, and Interpretation ---")
@@ -92,7 +85,8 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
     y = combined_df[TARGET_COLUMN]
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    if verbose_output: logger.info("\nData split into training and testing sets.")
+    if verbose_output:
+        logger.info("\nData split into training and testing sets.")
 
     preprocessor = get_preprocessor(CATEGORICAL_FEATURES, NUMERICAL_FEATURES, BINARY_FEATURES)
 
@@ -125,13 +119,13 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
     stacked_metrics = None
     if run_stacked_ensemble:
         base_models = {'lr': lr_model, 'rf': rf_model, 'xgb': xgb_model}
-        stacked_model, _, _, stacked_metrics = train_stacked_model(base_models, X_train_processed, y_train, X_test_processed, y_test, meta_classifier, dask_client)
+        stacked_model, _, _, stacked_metrics, stacked_input_example = train_stacked_model(base_models, X_train_processed, y_train, X_test_processed, y_test, meta_classifier, dask_client)
 
     logger.info("\n--- Model Interpretability (Random Forest) ---")
     if rf_model is not None:
         interpret_model(rf_model, X_train_processed, feature_names)
 
-    return lr_model, lr_metrics, rf_model, rf_metrics, xgb_model, xgb_metrics, stacked_model, stacked_metrics, X, y, preprocessor
+    return lr_model, lr_metrics, rf_model, rf_metrics, xgb_model, xgb_metrics, stacked_model, stacked_metrics, X, y, preprocessor, stacked_input_example
 
 def perform_final_model_evaluation(model, X_original, y_original, fitted_preprocessor, model_name, dask_client, verbose_output):
     logger = logging.getLogger('heart_disease_analysis')
@@ -159,7 +153,7 @@ def _extract_metrics_from_report(metrics_dict, prefix):
     extracted = {}
     if 'classification_report' in metrics_dict and isinstance(metrics_dict['classification_report'], dict):
         report = metrics_dict['classification_report']
-        # Assuming binary classification with '0' and '1' as class labels
+        # Assuming binary classification with '0', '1' as class labels
         for cls in ['0', '1']:
             if cls in report:
                 extracted[f'{prefix}_precision_class{cls}'] = report[cls]['precision']
@@ -177,7 +171,7 @@ def _extract_metrics_from_report(metrics_dict, prefix):
     return extracted
 
 def log_analysis_results(start_time, dask_type, lr_metrics, rf_metrics, xgb_metrics, stacked_metrics, run_stacked_ensemble, lr_cv_mean=None, lr_cv_std=None, rf_cv_mean=None, rf_cv_std=None, xgb_cv_mean=None, xgb_cv_std=None, stacked_cv_mean=None, stacked_cv_std=None):
-    logger = logging.getLogger('heart_disease_analysis')
+    # logger = logging.getLogger('heart_disease_analysis') # Removed unused logger assignment
     run_details = {
         'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
         'total_runtime_seconds': time.time() - start_time,
@@ -244,7 +238,7 @@ def run_analysis():
         combined_df = run_data_pipeline(VERBOSE_OUTPUT, SHOW_PLOTS)
 
         if combined_df is not None:
-            lr_model, lr_metrics, rf_model, rf_metrics, xgb_model, xgb_metrics, stacked_model, stacked_metrics, X, y, preprocessor = run_model_pipeline(
+            lr_model, lr_metrics, rf_model, rf_metrics, xgb_model, xgb_metrics, stacked_model, stacked_metrics, X, y, preprocessor, stacked_input_example = run_model_pipeline(
                 dask_client, combined_df, VERBOSE_OUTPUT, RUN_STACKED_ENSEMBLE, META_CLASSIFIER
             )
 
@@ -274,7 +268,7 @@ def run_analysis():
             mlflow.sklearn.log_model(rf_model, name="random_forest_model", input_example=processed_input_example)  # type: ignore
             mlflow.xgboost.log_model(xgb_model.named_steps['classifier'], name="xgboost_model", input_example=processed_input_example)  # type: ignore
             if RUN_STACKED_ENSEMBLE and stacked_model is not None:
-                mlflow.sklearn.log_model(stacked_model, name="stacked_ensemble_model", input_example=processed_input_example)  # type: ignore
+                mlflow.sklearn.log_model(stacked_model, name="stacked_ensemble_model", input_example=stacked_input_example[:5])  # type: ignore
 
     finally:
         if dask_client:

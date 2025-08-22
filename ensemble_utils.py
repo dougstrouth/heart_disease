@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix, classification_report
 from dask.distributed import Client
 from typing import Optional
@@ -37,7 +36,7 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
         oof_preds = np.zeros(X_train.shape[0])
         for fold, (train_idx, val_idx) in enumerate(skf.split(X_train, y_train)):
             fold_X_train, fold_y_train = X_train[train_idx], y_train.iloc[train_idx]
-            fold_X_val, fold_y_val = X_train[val_idx], y_train.iloc[val_idx]
+            fold_X_val = X_train[val_idx]
 
             # Fit base model on fold training data
             model.fit(fold_X_train, fold_y_train)
@@ -67,7 +66,7 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
     conf_matrix = confusion_matrix(y_test, y_pred_stacked)
     class_report_dict = classification_report(y_test, y_pred_stacked, output_dict=True)
 
-    logger.info(f"\n--- Stacked Model Evaluation ---")
+    logger.info("\n--- Stacked Model Evaluation ---")
     logger.info(f"Accuracy: {accuracy:.4f}")
     logger.info(f"Precision: {precision:.4f}")
     logger.info(f"Recall: {recall:.4f}")
@@ -97,5 +96,5 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
         'classification_report': class_report_dict,
     }
 
-    return meta_classifier, y_pred_stacked, y_proba_stacked, metrics
+    return meta_classifier, y_pred_stacked, y_proba_stacked, metrics, test_predictions
 

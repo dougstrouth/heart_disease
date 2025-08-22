@@ -1,9 +1,8 @@
-import pandas as pd
+import numpy as np
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
-import logging
 
 from config import DASK_TYPE
 
@@ -13,7 +12,7 @@ if DASK_TYPE == 'coiled':
     from dask_ml.preprocessing import OneHotEncoder as DaskOneHotEncoder
 
 def get_preprocessor(categorical_features, numerical_features, binary_features):
-    logger = logging.getLogger('heart_disease_analysis')
+    # logger = logging.getLogger('heart_disease_analysis') # Removed unused logger assignment
     """
     Creates and returns a ColumnTransformer for preprocessing.
     Conditionally uses Dask-ML preprocessors if DASK_TYPE is 'coiled'.
@@ -50,7 +49,7 @@ def get_preprocessor(categorical_features, numerical_features, binary_features):
     return preprocessor
 
 def get_feature_names(preprocessor):
-    logger = logging.getLogger('heart_disease_analysis')
+    # logger = logging.getLogger('heart_disease_analysis') # Removed unused logger assignment
     """
     Gets feature names from a fitted ColumnTransformer.
     Handles both scikit-learn and Dask-ML ColumnTransformers.
