@@ -5,8 +5,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix, classification_report
 from dask.distributed import Client
 from typing import Optional
+import logging
 
 def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, meta_classifier, dask_client: Optional[Client] = None, n_splits_skf=5):
+    logger = logging.getLogger('heart_disease_analysis')
     """
     Trains a stacked ensemble model.
 
@@ -23,7 +25,7 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
     Returns:
         tuple: (stacked_model, y_pred, y_proba, metrics)
     """
-    print("\n--- Training Stacked Ensemble Model ---")
+    logger.info("\n--- Training Stacked Ensemble Model ---")
 
     # Generate out-of-fold predictions for base models on training data
     # This prevents data leakage from base models to the meta-model
@@ -48,7 +50,7 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
         test_predictions[model_name] = model.predict_proba(X_test)[:, 1]
 
     # Train meta-classifier
-    print("Training meta-classifier...")
+    logger.info("Training meta-classifier...")
     meta_classifier.fit(oof_predictions, y_train)
 
     # Make predictions with stacked model
@@ -62,20 +64,20 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
     f1 = f1_score(y_test, y_pred_stacked)
     roc_auc = roc_auc_score(y_test, y_proba_stacked)
     conf_matrix = confusion_matrix(y_test, y_pred_stacked)
-    class_report = classification_report(y_test, y_pred_stacked)
+    class_report_dict = classification_report(y_test, y_pred_stacked, output_dict=True)
 
-    print(f"\n--- Stacked Model Evaluation ---")
-    print(f"Accuracy: {accuracy:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"Recall: {recall:.4f}")
-    print(f"F1-Score: {f1:.4f}")
-    print(f"ROC AUC: {roc_auc:.4f}")
+    logger.info(f"\n--- Stacked Model Evaluation ---")
+    logger.info(f"Accuracy: {accuracy:.4f}")
+    logger.info(f"Precision: {precision:.4f}")
+    logger.info(f"Recall: {recall:.4f}")
+    logger.info(f"F1-Score: {f1:.4f}")
+    logger.info(f"ROC AUC: {roc_auc:.4f}")
 
-    print("\nConfusion Matrix:")
-    print(conf_matrix)
+    logger.info("\nConfusion Matrix:")
+    logger.info(conf_matrix)
 
-    print("\nClassification Report:")
-    print(class_report)
+    logger.info("\nClassification Report:")
+    logger.info(classification_report(y_test, y_pred_stacked)) # Print readable format
 
     metrics = {
         'accuracy': accuracy,
@@ -84,7 +86,7 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
         'f1_score': f1,
         'roc_auc': roc_auc,
         'confusion_matrix': conf_matrix,
-        'classification_report': class_report,
+        'classification_report': class_report_dict,
     }
 
     return meta_classifier, y_pred_stacked, y_proba_stacked, metrics

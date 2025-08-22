@@ -27,6 +27,10 @@ XGB_N_ESTIMATORS_OPTIONS = [50, 100, 200, 300, 400, 500, 750, 1000]
 XGB_LEARNING_RATE_OPTIONS = [0.001, 0.005, 0.01, 0.05, 0.1, 0.2, 0.3, 0.5]
 
 RF_RANDOM_SEARCH_N_ITER = 200 # Number of iterations for RandomizedSearchCV for Random Forest
+LR_RANDOM_SEARCH_N_ITER = 50 # Number of iterations for RandomizedSearchCV for Logistic Regression
+XGB_RANDOM_SEARCH_N_ITER = 100 # Number of iterations for RandomizedSearchCV for XGBoost
+
+CV_FOLDS = 5 # Number of cross-validation folds for GridSearchCV/RandomizedSearchCV
 
 # --- Configuration for Stacked Ensemble ---
 RUN_STACKED_ENSEMBLE = True # Set to True to run the stacked ensemble
