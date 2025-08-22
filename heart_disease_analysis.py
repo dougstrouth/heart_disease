@@ -83,6 +83,10 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
     X = combined_df.drop(TARGET_COLUMN, axis=1)
     y = combined_df[TARGET_COLUMN]
 
+    if DASK_TYPE == 'coiled':
+        X = X.compute()
+        y = y.compute()
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     if verbose_output:
         logger.info("\nData split into training and testing sets.")

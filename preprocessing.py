@@ -4,37 +4,20 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 
-from config import DASK_TYPE
-
-# Import Dask-ML preprocessors
-if DASK_TYPE == 'coiled':
-    from dask_ml.preprocessing import StandardScaler as DaskStandardScaler
-    from dask_ml.preprocessing import OneHotEncoder as DaskOneHotEncoder
-
 def get_preprocessor(categorical_features, numerical_features, binary_features):
     # logger = logging.getLogger('heart_disease_analysis') # Removed unused logger assignment
     """
     Creates and returns a ColumnTransformer for preprocessing.
     Conditionally uses Dask-ML preprocessors if DASK_TYPE is 'coiled'.
     """
-    if DASK_TYPE == 'coiled':
-        numerical_transformer = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='mean')), # SimpleImputer is pandas/numpy compatible
-            ('scaler', DaskStandardScaler())
-        ])
+    numerical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='mean')),
+        ('scaler', StandardScaler())
+    ])
 
-        categorical_transformer = Pipeline(steps=[
-            ('onehot', DaskOneHotEncoder(handle_unknown='ignore'))
-        ])
-    else:
-        numerical_transformer = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='mean')),
-            ('scaler', StandardScaler())
-        ])
-
-        categorical_transformer = Pipeline(steps=[
-            ('onehot', OneHotEncoder(handle_unknown='ignore'))
-        ])
+    categorical_transformer = Pipeline(steps=[
+        ('onehot', OneHotEncoder(handle_unknown='ignore'))
+    ])
 
     binary_transformer = 'passthrough'
 
@@ -65,13 +48,8 @@ def get_feature_names(preprocessor):
             final_transformer = transformer
 
         if hasattr(final_transformer, 'get_feature_names_out'):
-            # Dask-ML OneHotEncoder has get_feature_names_out
             names = final_transformer.get_feature_names_out(features)
-            # For Dask-ML OneHotEncoder, get_feature_names_out returns a Dask Array, compute it
-            if DASK_TYPE == 'coiled' and isinstance(names, np.ndarray) and names.dtype == object:
-                feature_names.extend(names.tolist())
-            else:
-                feature_names.extend(names)
+            feature_names.extend(names)
         else:
             feature_names.extend(features)
     return feature_names
