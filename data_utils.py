@@ -5,16 +5,11 @@ import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-
 # Define feature lists based on the full set of features after harmonization
 TARGET_COLUMN = 'heart_disease'
-ALL_NUMERICAL_FEATURES = ['age', 'trestbps', 'chol', 'thalach', 'oldpeak', 'ca', 'bmi']
-ALL_CATEGORICAL_FEATURES = ['sex', 'cp', 'fbs', 'restecg', 'exang', 'slope', 'thal', 'smoking', 'diabetes']
+NUMERICAL_FEATURES = ['age', 'trestbps', 'chol', 'thalach', 'oldpeak', 'ca', 'bmi']
+CATEGORICAL_FEATURES = ['sex', 'cp', 'restecg', 'slope', 'thal']
+BINARY_FEATURES = ['fbs', 'exang', 'smoking', 'diabetes']
 
 def load_data(file_path):
     """
@@ -92,11 +87,18 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
     print(f"Dropped {initial_rows - rows_after_dropna} rows with NaN in '{TARGET_COLUMN}'.")
     print(f"Combined dataset now has {rows_after_dropna} rows.")
 
-    for col in ALL_CATEGORICAL_FEATURES:
+    for col in CATEGORICAL_FEATURES:
         if col in combined_df.columns:
             combined_df[col] = combined_df[col].astype(str)
             combined_df[col] = combined_df[col].fillna('missing')
             if verbose_output: print(f"Converted '{col}' to string and filled NaNs.")
+
+    for col in BINARY_FEATURES:
+        if col in combined_df.columns:
+            # Ensure binary features are numeric before filling NaNs
+            combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce')
+            combined_df[col] = combined_df[col].fillna(0) # Fill NaNs with 0 for binary features
+            if verbose_output: print(f"Filled NaNs in binary feature '{col}' with 0.")
 
     combined_df[TARGET_COLUMN] = combined_df[TARGET_COLUMN].astype(int)
     combined_df[TARGET_COLUMN] = (combined_df[TARGET_COLUMN] > 0).astype(int)
@@ -119,7 +121,7 @@ def perform_eda(df, dataset_name, numerical_features, categorical_features, show
         print("Head:")
         print(df.head())
         print("\nInfo:")
-        print(df.info())
+        df.info()
         print("\nDescription:")
         print(df.describe())
         print("\nMissing values:")
@@ -154,62 +156,39 @@ def perform_eda(df, dataset_name, numerical_features, categorical_features, show
                     plt.title(f'Distribution of {col} ({dataset_name})')
                     plt.show()
 
-def get_preprocessor(categorical_features, numerical_features):
+def preprocess_data(df, preprocessor, target_column, cache_dir="cache", use_cache=True, verbose_output=False):
     """
-    Creates and returns a ColumnTransformer for preprocessing.
-    """
-    numerical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='mean')),
-        ('scaler', StandardScaler())
-    ])
-
-    categorical_transformer = Pipeline(steps=[
-        ('onehot', OneHotEncoder(handle_unknown='ignore'))
-    ])
-
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', numerical_transformer, numerical_features),
-            ('cat', categorical_transformer, categorical_features)
-        ],
-        remainder='passthrough'
-    )
-    return preprocessor
-
-def get_preprocessed_data(df, target_column, categorical_features, numerical_features, cache_dir="cache", verbose_output=False):
-    """
-    Preprocesses the DataFrame, splits into X and y, and caches the results.
+    Preprocesses the DataFrame using a provided preprocessor, splits into X and y, and caches the results.
     """
     X = df.drop(target_column, axis=1)
     y = df[target_column]
 
-    for col in categorical_features:
-        if col in X.columns:
-            X[col] = X[col].astype('category')
-
-    features_for_preprocessing_numerical = [f for f in numerical_features if f in X.columns and f != 'source']
-    features_for_preprocessing_categorical = [f for f in categorical_features if f in X.columns and f != 'source']
-
-    preprocessor = get_preprocessor(features_for_preprocessing_categorical, features_for_preprocessing_numerical)
+    if 'source' in X.columns:
+        X = X.drop('source', axis=1)
 
     os.makedirs(cache_dir, exist_ok=True)
-    X_cache_path = os.path.join(cache_dir, "X_combined.joblib")
-    y_cache_path = os.path.join(cache_dir, "y_combined.joblib")
-    preprocessor_cache_path = os.path.join(cache_dir, "preprocessor_combined.joblib")
+    X_cache_path = os.path.join(cache_dir, "X_processed.joblib")
+    y_cache_path = os.path.join(cache_dir, "y_processed.joblib")
 
-    if os.path.exists(X_cache_path) and os.path.exists(y_cache_path) and os.path.exists(preprocessor_cache_path):
+    if use_cache and os.path.exists(X_cache_path) and os.path.exists(y_cache_path):
         if verbose_output: print("\nLoading preprocessed data from cache...")
-        X_cached = joblib.load(X_cache_path)
-        y_cached = joblib.load(y_cache_path)
-        preprocessor_cached = joblib.load(preprocessor_cache_path)
+        X_processed = joblib.load(X_cache_path)
+        y_processed = joblib.load(y_cache_path)
         if verbose_output: print("Preprocessed data loaded from cache.")
-        return X_cached, y_cached, preprocessor_cached
-    else:
-        if verbose_output: print("\nPreprocessing data and saving to cache...")
-        X_processed = preprocessor.fit_transform(X)
+        return X_processed, y_processed
+
+    if verbose_output: print("\nPreprocessing data...")
+    
+    # Debugging: Check for NaNs before preprocessing
+    if X.isnull().sum().sum() > 0:
+        print("WARNING: NaNs found in X before preprocessing:")
+        print(X.isnull().sum()[X.isnull().sum() > 0])
         
+    X_processed = preprocessor.fit_transform(X)
+
+    if use_cache:
         joblib.dump(X_processed, X_cache_path)
         joblib.dump(y, y_cache_path)
-        joblib.dump(preprocessor, preprocessor_cache_path)
         if verbose_output: print("Preprocessed data saved to cache.")
-        return X_processed, y, preprocessor
+
+    return X_processed, y
