@@ -27,6 +27,10 @@ def load_data(file_path):
         else:
             df = pd.read_csv(file_path)
             logger.info(f"Successfully loaded pandas DataFrame from {file_path}")
+        
+        logger.debug(f"Head of {file_path} after loading:\n{df.head()}")
+        logger.debug(f"Dtypes of {file_path} after loading:\n{df.dtypes}")
+        
         return df
     except FileNotFoundError:
         logger.error(f"Error: {file_path} not found. Please ensure the file is in the correct directory.")
@@ -50,6 +54,9 @@ def harmonize_datasets(df_synthetic, df_uci, verbose_output=False):
 
     df_synthetic_harmonized = df_synthetic.copy()
     df_uci_harmonized = df_uci.copy()
+
+    logger.debug(f"df_synthetic_harmonized head before renames:\n{df_synthetic_harmonized.head()}")
+    logger.debug(f"df_uci_harmonized head before renames:\n{df_uci_harmonized.head()}")
 
     if 'thalch' in df_uci_harmonized.columns:
         df_uci_harmonized = df_uci_harmonized.rename(columns={'thalch': 'thalach'})
@@ -99,13 +106,28 @@ def harmonize_datasets(df_synthetic, df_uci, verbose_output=False):
         df_synthetic_harmonized = df_synthetic_harmonized.repartition(npartitions=df_uci_harmonized.npartitions) # Align partitions
         df_uci_harmonized = df_uci_harmonized.repartition(npartitions=df_synthetic_harmonized.npartitions) # Align partitions
         
-        # Reindex to ensure all columns are present, filling missing with NaN
-        df_synthetic_harmonized = df_synthetic_harmonized.reindex(columns=expected_final_columns, fill_value=np.nan)
-        df_uci_harmonized = df_uci_harmonized.reindex(columns=expected_final_columns, fill_value=np.nan)
+        # Explicitly add missing columns with NaN for Dask DataFrames
+        for col in expected_final_columns:
+            if col not in df_synthetic_harmonized.columns:
+                df_synthetic_harmonized[col] = np.nan
+            if col not in df_uci_harmonized.columns:
+                df_uci_harmonized[col] = np.nan
+
+        # After adding missing columns, ensure binary features that might have been filled with NaN are set to 0
+        for feature in BINARY_FEATURES:
+            if feature in df_synthetic_harmonized.columns:
+                df_synthetic_harmonized[feature] = df_synthetic_harmonized[feature].fillna(0)
+            if feature in df_uci_harmonized.columns:
+                df_uci_harmonized[feature] = df_uci_harmonized[feature].fillna(0)
 
     # Ensure the order of columns is consistent for concatenation
     df_synthetic_harmonized = df_synthetic_harmonized[expected_final_columns]
     df_uci_harmonized = df_uci_harmonized[expected_final_columns]
+
+    logger.debug(f"df_synthetic_harmonized head after harmonization:\n{df_synthetic_harmonized.head()}")
+    logger.debug(f"df_uci_harmonized head after harmonization:\n{df_uci_harmonized.head()}")
+    logger.debug(f"df_synthetic_harmonized dtypes after harmonization:\n{df_synthetic_harmonized.dtypes}")
+    logger.debug(f"df_uci_harmonized dtypes after harmonization:\n{df_uci_harmonized.dtypes}")
 
     if verbose_output: logger.info("Datasets harmonized successfully. Ready for concatenation.")
     return df_synthetic_harmonized, df_uci_harmonized
@@ -128,6 +150,9 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
     else:
         combined_df = pd.concat([df_synthetic_harmonized, df_uci_harmonized], ignore_index=True)
         logger.info(f"Combined pandas dataset created with {len(combined_df)} rows.")
+
+    logger.debug(f"Combined_df head before NaN drop:\n{combined_df.head()}")
+    logger.debug(f"Combined_df dtypes before NaN drop:\n{combined_df.dtypes}")
 
     # Drop rows with NaN in TARGET_COLUMN
     if is_dask:
@@ -162,6 +187,14 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
                 combined_df[col] = combined_df[col].fillna(0) # Fill NaNs with 0 for binary features
             if verbose_output: logger.info(f"Filled NaNs in binary feature '{col}' with 0.")
 
+    for col in NUMERICAL_FEATURES:
+        if col in combined_df.columns:
+            if is_dask:
+                combined_df[col] = dd.to_numeric(combined_df[col], errors='coerce')
+            else:
+                combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce')
+            if verbose_output: logger.info(f"Coerced '{col}' to numeric, converting errors to NaN.")
+
     if is_dask:
         # For Dask, ensure target column is computed and binarized
         combined_df[TARGET_COLUMN] = combined_df[TARGET_COLUMN].astype(int)
@@ -170,6 +203,9 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
         combined_df[TARGET_COLUMN] = combined_df[TARGET_COLUMN].astype(int)
         combined_df[TARGET_COLUMN] = (combined_df[TARGET_COLUMN] > 0).astype(int)
     if verbose_output: logger.info(f"Binarized '{TARGET_COLUMN}': values > 0 converted to 1.")
+
+    logger.debug(f"Combined_df head after cleaning:\n{combined_df.head()}")
+    logger.debug(f"Combined_df dtypes after cleaning:\n{combined_df.dtypes}")
 
     return combined_df
 

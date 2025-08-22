@@ -4,7 +4,7 @@ from sklearn.linear_model import LogisticRegression
 SHOW_PLOTS = False  # Set to True to display plots, False to suppress them
 VERBOSE_OUTPUT = False # Set to True for more detailed print statements
 # Dask type can be 'local' or 'coiled'. If 'coiled', ensure you have a Coiled account and are logged in.
-DASK_TYPE = 'coiled'
+DASK_TYPE = 'local'
 
 # --- Configuration for Automated Parameter Search ---
 TARGET_RUN_TIME_MINUTES = 5.0  # Target maximum runtime for the full analysis

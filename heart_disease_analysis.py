@@ -5,13 +5,15 @@ import numpy as np
 import logging
 import dask.dataframe as dd
 import mlflow # Added for MLflow integration
+import mlflow.sklearn
+import mlflow.xgboost
 
 # Define MLflow Tracking and Artifact URIs
 # For local tracking, use a file URI. For GCS artifact storage, use gs://
 MLFLOW_TRACKING_URI = "file:///Users/dougstrouth/Library/Mobile Documents/com~apple~CloudDocs/Documents/GitHub/heart_disease/mlruns"
 MLFLOW_ARTIFACT_URI = "gs://my-heart-disease-data-bucket/mlflow-artifacts"
 
-from config import SHOW_PLOTS, VERBOSE_OUTPUT, DASK_TYPE, RUN_STACKED_ENSEMBLE, META_CLASSIFIER, CV_FOLDS
+from config import SHOW_PLOTS, VERBOSE_OUTPUT, DASK_TYPE, RUN_STACKED_ENSEMBLE, META_CLASSIFIER, CV_FOLDS, LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, RF_MIN_SAMPLES_SPLIT_OPTIONS, RF_MIN_SAMPLES_LEAF_OPTIONS, XGB_N_ESTIMATORS_OPTIONS, XGB_LEARNING_RATE_OPTIONS
 from dask_utils import get_dask_client
 from data_utils import load_data, combine_and_clean_data, perform_eda, preprocess_data, TARGET_COLUMN, NUMERICAL_FEATURES, CATEGORICAL_FEATURES, BINARY_FEATURES
 from model_training import train_evaluate_model, train_stacked_model
@@ -100,13 +102,24 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
     feature_names = get_feature_names(preprocessor)
 
     # Logistic Regression
-    lr_model, _, _, lr_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, model_type='logistic_regression', param_grid={'classifier__C': [1.0]}, dask_client=dask_client)
+    lr_param_grid = {'classifier__C': LR_C_OPTIONS}
+    lr_model, _, _, lr_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='logistic_regression', param_grid=lr_param_grid, dask_client=dask_client)
 
     # Random Forest
-    rf_model, _, _, rf_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, model_type='random_forest', param_grid={'classifier__n_estimators': [100]}, dask_client=dask_client)
+    rf_param_grid = {
+        'classifier__n_estimators': RF_N_ESTIMATORS_OPTIONS,
+        'classifier__max_depth': RF_MAX_DEPTH_OPTIONS,
+        'classifier__min_samples_split': RF_MIN_SAMPLES_SPLIT_OPTIONS,
+        'classifier__min_samples_leaf': RF_MIN_SAMPLES_LEAF_OPTIONS
+    }
+    rf_model, _, _, rf_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='random_forest', param_grid=rf_param_grid, dask_client=dask_client)
 
     # XGBoost
-    xgb_model, _, _, xgb_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, model_type='xgboost', param_grid={'classifier__n_estimators': [100]}, dask_client=dask_client)
+    xgb_param_grid = {
+        'classifier__n_estimators': XGB_N_ESTIMATORS_OPTIONS,
+        'classifier__learning_rate': XGB_LEARNING_RATE_OPTIONS
+    }
+    xgb_model, _, _, xgb_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='xgboost', param_grid=xgb_param_grid, dask_client=dask_client)
 
     stacked_model = None
     stacked_metrics = None
@@ -247,18 +260,21 @@ def run_analysis():
             log_analysis_results(start_time_total, DASK_TYPE, lr_metrics, rf_metrics, xgb_metrics, stacked_metrics, RUN_STACKED_ENSEMBLE, lr_cv_mean, lr_cv_std, rf_cv_mean, rf_cv_std, xgb_cv_mean, xgb_cv_std, stacked_cv_mean, stacked_cv_std)
 
             # MLflow Logging
-            mlflow.log_metric("lr_cv_roc_auc", lr_cv_mean)
-            mlflow.log_metric("rf_cv_roc_auc", rf_cv_mean)
-            mlflow.log_metric("xgb_cv_roc_auc", xgb_cv_mean)
+            mlflow.log_metric("lr_cv_roc_auc", float(lr_cv_mean))
+            mlflow.log_metric("rf_cv_roc_auc", float(rf_cv_mean))
+            mlflow.log_metric("xgb_cv_roc_auc", float(xgb_cv_mean))
             if RUN_STACKED_ENSEMBLE and stacked_cv_mean is not None:
-                mlflow.log_metric("stacked_cv_roc_auc", stacked_cv_mean)
+                mlflow.log_metric("stacked_cv_roc_auc", float(stacked_cv_mean))
+
+            # Create a processed input example for MLflow logging
+            processed_input_example = preprocessor.transform(X[:5])
 
             # Log models
-            mlflow.sklearn.log_model(lr_model, "logistic_regression_model")
-            mlflow.sklearn.log_model(rf_model, "random_forest_model")
-            mlflow.xgboost.log_model(xgb_model, "xgboost_model") # Use mlflow.xgboost for XGBoost models
+            mlflow.sklearn.log_model(lr_model, name="logistic_regression_model", input_example=processed_input_example)  # type: ignore
+            mlflow.sklearn.log_model(rf_model, name="random_forest_model", input_example=processed_input_example)  # type: ignore
+            mlflow.xgboost.log_model(xgb_model.named_steps['classifier'], name="xgboost_model", input_example=processed_input_example)  # type: ignore
             if RUN_STACKED_ENSEMBLE and stacked_model is not None:
-                mlflow.sklearn.log_model(stacked_model, "stacked_ensemble_model")
+                mlflow.sklearn.log_model(stacked_model, name="stacked_ensemble_model", input_example=processed_input_example)  # type: ignore
 
     finally:
         if dask_client:

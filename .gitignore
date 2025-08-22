@@ -179,3 +179,14 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# MLflow
+mlruns/
+
+# Project-specific generated files
+cache/
+combined_heart_disease_dataset.csv
+run_logs.csv
+
+# macOS specific
+.DS_Store

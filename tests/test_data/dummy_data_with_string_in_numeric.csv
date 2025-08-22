@@ -1,0 +1,5 @@
+age,trestbps,chol,thalach,oldpeak,ca,bmi,sex,cp,restecg,slope,thal,fbs,exang,smoking,diabetes,heart_disease,source
+63,145,233,150,2.3,0,25,1,3,0,0,1,0,0,0,0,0,Synthetic
+37,130,250,187,3.5,0,28,1,2,1,2,2,0,0,0,0,0,Synthetic
+41,130,204,172,1.4,0,22,0,1,0,2,2,0,0,0,0,0,Synthetic
+56,120,pratyushpuri,160,0.0,0,27,1,1,0,2,2,0,0,0,0,0,Synthetic

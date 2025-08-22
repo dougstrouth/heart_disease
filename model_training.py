@@ -25,7 +25,7 @@ from config import LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, 
 # Import stacking utility
 from ensemble_utils import train_stacked_model
 
-def train_evaluate_model(X_train, y_train, X_test, y_test, model_type='logistic_regression', param_grid=None, dask_client: Optional[Client] = None):
+def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_test_processed, model_type='logistic_regression', param_grid=None, dask_client: Optional[Client] = None):
     logger = logging.getLogger('heart_disease_analysis')
     """
     Trains and evaluates a specified machine learning model.
@@ -104,7 +104,7 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, model_type='logistic_
         if model_type == 'random_forest':
             search = RandomizedSearchCV(model_pipeline, param_grid, cv=CV_FOLDS, scoring='roc_auc', n_iter=RF_RANDOM_SEARCH_N_ITER, n_jobs=-1, verbose=1)
         elif model_type == 'logistic_regression':
-            search = RandomizedSearchCV(model_pipeline, param_grid, cv=CV_FOLDS, scoring='roc_auc', n_iter=LR_RANDOM_SEARCH_N_ITER, n_jobs=-1, verbose=1)
+            search = RandomizedSearchCV(model_pipeline, param_grid, cv=CV_FOLDS, scoring='roc_auc', n_iter=LR_RANDOM_SEARCH_N_ITER, n_jobs=1, verbose=1) # Changed n_jobs to 1 for liblinear solver
         elif model_type == 'xgboost':
             search = RandomizedSearchCV(model_pipeline, param_grid, cv=CV_FOLDS, scoring='roc_auc', n_iter=XGB_RANDOM_SEARCH_N_ITER, n_jobs=-1, verbose=1)
         else:
@@ -134,11 +134,11 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, model_type='logistic_
 
     # MLflow: Log the trained model
     if model_type == 'logistic_regression':
-        mlflow.sklearn.log_model(best_model, "logistic_regression_model")
+        mlflow.sklearn.log_model(best_model, name="logistic_regression_model", input_example=X_train_processed[:5])  # type: ignore
     elif model_type == 'random_forest':
-        mlflow.sklearn.log_model(best_model, "random_forest_model")
+        mlflow.sklearn.log_model(best_model, name="random_forest_model", input_example=X_train_processed[:5])  # type: ignore
     elif model_type == 'xgboost':
-        mlflow.xgboost.log_model(best_model, "xgboost_model")
+        mlflow.xgboost.log_model(best_model.named_steps['classifier'], name="xgboost_model", input_example=X_train_processed[:5])  # type: ignore
 
     # joblib.dump(best_model, model_cache_path)
     # logger.info(f"Model cached to {model_cache_path}")
@@ -165,13 +165,13 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, model_type='logistic_
     logger.info(f"ROC AUC: {roc_auc:.4f}")
 
     # MLflow: Log final evaluation metrics
-    mlflow.log_metric(f"{model_type}_accuracy", accuracy)
-    mlflow.log_metric(f"{model_type}_precision", precision)
-    mlflow.log_metric(f"{model_type}_recall", recall)
-    mlflow.log_metric(f"{model_type}_f1_score", f1)
-    mlflow.log_metric(f"{model_type}_roc_auc", roc_auc)
-    mlflow.log_metric(f"{model_type}_train_accuracy", train_accuracy)
-    mlflow.log_metric(f"{model_type}_train_roc_auc", train_roc_auc)
+    mlflow.log_metric(f"{model_type}_accuracy", float(accuracy))
+    mlflow.log_metric(f"{model_type}_precision", float(precision))
+    mlflow.log_metric(f"{model_type}_recall", float(recall))
+    mlflow.log_metric(f"{model_type}_f1_score", float(f1))
+    mlflow.log_metric(f"{model_type}_roc_auc", float(roc_auc))
+    mlflow.log_metric(f"{model_type}_train_accuracy", float(train_accuracy))
+    mlflow.log_metric(f"{model_type}_train_roc_auc", float(train_roc_auc))
 
     metrics = {
         'accuracy': accuracy,
