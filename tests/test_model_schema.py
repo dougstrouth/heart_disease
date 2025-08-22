@@ -36,6 +36,15 @@ def dummy_data():
         'heart_disease': np.random.randint(0, 2, 100) # Target variable
     }
     df = pd.DataFrame(data)
+
+    # Explicitly convert categorical and binary columns to object (string) dtype
+    categorical_cols = ['sex', 'cp', 'restecg', 'slope', 'thal']
+    binary_cols = ['fbs', 'exang', 'smoking', 'diabetes']
+    
+    for col in categorical_cols + binary_cols:
+        if col in df.columns:
+            df[col] = df[col].astype(str)
+
     return df
 
 @pytest.fixture

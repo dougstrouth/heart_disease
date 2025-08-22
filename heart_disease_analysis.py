@@ -54,6 +54,16 @@ def run_data_pipeline(verbose_output, show_plots):
 
         # Perform EDA and save combined file locally
         if combined_df is not None:
+            # Convert numerical features to float to ensure consistent NaN handling
+            for col in NUMERICAL_FEATURES:
+                if col in combined_df.columns:
+                    combined_df[col] = combined_df[col].astype(float)
+
+            # Convert numerical features to float to ensure consistent NaN handling
+            for col in NUMERICAL_FEATURES:
+                if col in combined_df.columns:
+                    combined_df[col] = combined_df[col].astype(float)
+
             perform_eda(combined_df, "Combined Dataset", NUMERICAL_FEATURES, CATEGORICAL_FEATURES, show_plots=show_plots, verbose_output=verbose_output)
 
             output_csv_path = "combined_heart_disease_dataset.csv"
@@ -64,7 +74,7 @@ def run_data_pipeline(verbose_output, show_plots):
                 combined_df.to_csv(output_csv_path, index=False, single_file=True)
                 logger.info(f"Combined Dask dataset saved to {output_csv_path}")
 
-    else:
+    elif DASK_TYPE == 'coiled':
         # Load pre-combined dataset from GCS for Coiled runs
         combined_df = load_data('gs://my-heart-disease-data-bucket/data/combined_heart_disease_dataset.csv')
         logger.info(f"Data Loading completed in {time.time() - start_time_load:.2f} seconds.")
@@ -72,6 +82,31 @@ def run_data_pipeline(verbose_output, show_plots):
         # Perform EDA (no saving needed as it's already in GCS)
         if combined_df is not None:
             perform_eda(combined_df, "Combined Dataset", NUMERICAL_FEATURES, CATEGORICAL_FEATURES, show_plots=show_plots, verbose_output=verbose_output)
+
+    elif DASK_TYPE == 'cloud':
+        # Load pre-combined dataset from GCS for 'cloud' runs
+        combined_df = load_data('gs://my-heart-disease-data-bucket/data/combined_heart_disease_dataset.csv')
+        logger.info(f"Data Loading completed in {time.time() - start_time_load:.2f} seconds.")
+
+        # Perform EDA and save combined file locally
+        if combined_df is not None:
+            # Convert numerical features to float to ensure consistent NaN handling
+            for col in NUMERICAL_FEATURES:
+                if col in combined_df.columns:
+                    combined_df[col] = combined_df[col].astype(float)
+
+            perform_eda(combined_df, "Combined Dataset", NUMERICAL_FEATURES, CATEGORICAL_FEATURES, show_plots=show_plots, verbose_output=verbose_output)
+
+            output_csv_path = "combined_heart_disease_dataset.csv"
+            if isinstance(combined_df, pd.DataFrame):
+                combined_df.to_csv(output_csv_path, index=False)
+                logger.info(f"Combined dataset saved to {output_csv_path}")
+            else: # Assuming it's a Dask DataFrame
+                combined_df.to_csv(output_csv_path, index=False, single_file=True)
+                logger.info(f"Combined Dask dataset saved to {output_csv_path}")
+    else:
+        logger.error(f"Unsupported DASK_TYPE: {DASK_TYPE}. Please use 'local', 'coiled', or 'cloud'.")
+        combined_df = None
 
     return combined_df
 

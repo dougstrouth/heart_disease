@@ -19,12 +19,12 @@ y_test = pd.Series(np.random.randint(0, 2, 50))
 @pytest.fixture(autouse=True)
 def mock_mlflow():
     with (
-        patch('mlflow.log_params') as mock_log_params,
+        patch('mlflow.log_param') as mock_log_param,
         patch('mlflow.log_metric') as mock_log_metric,
         patch('mlflow.sklearn.log_model') as mock_log_sklearn_model,
         patch('mlflow.xgboost.log_model') as mock_log_xgboost_model
     ):
-        yield mock_log_params, mock_log_metric, mock_log_sklearn_model, mock_log_xgboost_model
+        yield mock_log_param, mock_log_metric, mock_log_sklearn_model, mock_log_xgboost_model
 
 @patch('model_training.RandomizedSearchCV')
 def test_train_evaluate_model_lr_n_jobs(mock_randomized_search_cv, mock_mlflow):
@@ -124,7 +124,7 @@ def test_train_evaluate_model_xgb_param_grid(mock_randomized_search_cv, mock_mlf
     assert mock_randomized_search_cv.call_args[1]['verbose'] == 1
 
 def test_train_evaluate_model_mlflow_logging(mock_mlflow):
-    mock_log_params, mock_log_metric, mock_log_sklearn_model, mock_log_xgboost_model = mock_mlflow
+    mock_log_param, mock_log_metric, mock_log_sklearn_model, mock_log_xgboost_model = mock_mlflow
 
     # Mock RandomizedSearchCV to return a simple estimator
     with patch('model_training.RandomizedSearchCV') as mock_randomized_search_cv:
@@ -143,7 +143,7 @@ def test_train_evaluate_model_mlflow_logging(mock_mlflow):
         )
 
         # Assert MLflow logging calls
-        mock_log_params.assert_called_once_with({'classifier__C': 1.0})
+        mock_log_param.assert_called_once_with('logistic_regression_classifier__C', 1.0)
         mock_log_metric.assert_any_call('logistic_regression_best_cv_roc_auc', 0.85)
         # Assert that accuracy is logged, but don't check the exact value due to randomness
         mock_log_metric.assert_any_call('logistic_regression_accuracy', ANY)
@@ -152,7 +152,7 @@ def test_train_evaluate_model_mlflow_logging(mock_mlflow):
         assert mock_log_sklearn_model.call_args[1]['input_example'].equals(X_train_processed[:5])
 
     # Test XGBoost logging separately due to different log_model call
-    mock_log_params.reset_mock()
+    mock_log_param.reset_mock()
     mock_log_metric.reset_mock()
     mock_log_sklearn_model.reset_mock()
     mock_log_xgboost_model.reset_mock()
@@ -176,7 +176,7 @@ def test_train_evaluate_model_mlflow_logging(mock_mlflow):
         )
 
         # Assert MLflow logging calls for XGBoost
-        mock_log_params.assert_called_once_with({'classifier__n_estimators': 100})
+        mock_log_param.assert_called_once_with('xgboost_classifier__n_estimators', 100)
         mock_log_metric.assert_any_call('xgboost_best_cv_roc_auc', 0.88)
         # Assert that accuracy is logged, but don't check the exact value due to randomness
         mock_log_metric.assert_any_call('xgboost_accuracy', ANY)

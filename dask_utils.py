@@ -7,19 +7,19 @@ def get_dask_client(cluster_type='local', **kwargs):
     Initializes and returns a Dask client for either a local or Coiled cluster.
 
     Args:
-        cluster_type (str): Type of Dask cluster ('local' or 'coiled').
+        cluster_type (str): Type of Dask cluster ('local', 'coiled', or 'cloud').
         **kwargs: Additional keyword arguments for cluster initialization.
     Returns:
         dask.distributed.Client: A Dask client instance.
     """
-    if cluster_type == 'local':
+    if cluster_type == 'local' or cluster_type == 'cloud':
         cluster = LocalCluster(n_workers=4, threads_per_worker=2, memory_limit='1.5GB', **kwargs)
         client = Client(cluster)
     elif cluster_type == 'coiled':
         cluster = coiled.Cluster(n_workers=4, **kwargs)
         client = cluster.get_client()
     else:
-        raise ValueError("cluster_type must be 'local' or 'coiled'")
+        raise ValueError("cluster_type must be 'local', 'coiled', or 'cloud'")
 
     return client
 

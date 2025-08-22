@@ -17,7 +17,7 @@ from dask.distributed import Client
 
 # Import configuration options
 from config import RF_RANDOM_SEARCH_N_ITER, LR_RANDOM_SEARCH_N_ITER, XGB_RANDOM_SEARCH_N_ITER, CV_FOLDS
-from preprocessing import get_feature_names
+
 
 # Import stacking utility
 
@@ -119,7 +119,9 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_
         logger.info(f"Best ROC AUC score for {model_name}: {search.best_score_:.4f}")
 
         # MLflow: Log best parameters and best CV score
-        mlflow.log_params(search.best_params_)
+        # MLflow: Log best parameters with model-specific prefixes
+        for param_name, param_value in search.best_params_.items():
+            mlflow.log_param(f"{model_type}_{param_name}", param_value)
         mlflow.log_metric(f"{model_type}_best_cv_roc_auc", search.best_score_)
 
     else:

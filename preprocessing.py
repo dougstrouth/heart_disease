@@ -16,6 +16,7 @@ def get_preprocessor(categorical_features, numerical_features, binary_features):
     ])
 
     categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
         ('onehot', OneHotEncoder(handle_unknown='ignore'))
     ])
 

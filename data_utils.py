@@ -25,7 +25,10 @@ def load_data(file_path):
             df = dd.read_csv(file_path, dtype={'cp': 'object', 'restecg': 'object', 'sex': 'object', 'slope': 'object'})
             logger.info(f"Successfully loaded Dask DataFrame from {file_path}")
         else:
-            df = pd.read_csv(file_path)
+            df = pd.read_csv(file_path, dtype={
+                'sex': 'object', 'cp': 'object', 'restecg': 'object', 'slope': 'object', 'thal': 'object',
+                'fbs': 'object', 'exang': 'object', 'smoking': 'object', 'diabetes': 'object'
+            })
             logger.info(f"Successfully loaded pandas DataFrame from {file_path}")
         
         logger.debug(f"Head of {file_path} after loading:\n{df.head()}")
