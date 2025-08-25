@@ -1,44 +1,42 @@
-import numpy as np
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.base import BaseEstimator, TransformerMixin
 import pandas as pd # Import pandas for CategoricalDtype
 
 # Import DASK_TYPE from config
 from config import DASK_TYPE
 
-# Conditionally import Dask-ML preprocessors
-if DASK_TYPE != 'local':
-    from dask_ml.preprocessing import StandardScaler as DaskStandardScaler
-    from dask_ml.preprocessing import OneHotEncoder as DaskOneHotEncoder
-    from dask_ml.impute import SimpleImputer as DaskSimpleImputer
-    from dask_ml.compose import ColumnTransformer as DaskColumnTransformer
-    from sklearn.base import BaseEstimator, TransformerMixin # Import for custom transformer
+# Import Dask-ML preprocessors
+from dask_ml.preprocessing import StandardScaler as DaskStandardScaler
+from dask_ml.preprocessing import OneHotEncoder as DaskOneHotEncoder
+from dask_ml.impute import SimpleImputer as DaskSimpleImputer
+from dask_ml.compose import ColumnTransformer as DaskColumnTransformer
 
-    class ToCategoricalDtype(BaseEstimator, TransformerMixin):
-        def fit(self, X, y=None):
-            return self
-        def transform(self, X):
-            # Ensure X is a Dask DataFrame or Series
-            if isinstance(X, pd.DataFrame):
-                return X.astype('category')
-            elif isinstance(X, pd.Series):
-                return X.astype('category')
-            elif hasattr(X, 'to_dask_dataframe'): # Dask Array
-                return X.to_dask_dataframe().astype('category')
-            else: # Dask DataFrame
-                return X.astype('category')
-else:
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.preprocessing import OneHotEncoder
-    from sklearn.impute import SimpleImputer
+class ToCategoricalDtype(BaseEstimator, TransformerMixin):
+    def fit(self, X, y=None):
+        return self
+    def transform(self, X):
+        # Ensure X is a Dask DataFrame or Series
+        if isinstance(X, pd.DataFrame):
+            return X.astype('category')
+        elif isinstance(X, pd.Series):
+            return X.astype('category')
+        elif hasattr(X, 'to_dask_dataframe'): # Dask Array
+            return X.to_dask_dataframe().astype('category')
+        else: # Dask DataFrame
+            return X.astype('category')
 
-def get_preprocessor(categorical_features, numerical_features, binary_features):
+def get_preprocessor(categorical_features, numerical_features, binary_features, use_dask_ml=None):
     """
     Creates and returns a ColumnTransformer for preprocessing.
     Conditionally uses Dask-ML preprocessors if DASK_TYPE is not 'local'.
     """
-    if DASK_TYPE != 'local':
+    if use_dask_ml is None:
+        use_dask_ml = (DASK_TYPE != 'local')
+
+    if use_dask_ml:
         numerical_transformer = Pipeline(steps=[
             ('imputer', DaskSimpleImputer(strategy='mean')),
             ('scaler', DaskStandardScaler())
@@ -47,12 +45,12 @@ def get_preprocessor(categorical_features, numerical_features, binary_features):
         categorical_transformer = Pipeline(steps=[
             ('imputer', DaskSimpleImputer(strategy='constant', fill_value='missing')),
             ('to_category', ToCategoricalDtype()), # Use custom transformer
-            ('onehot', DaskOneHotEncoder(handle_unknown='error'))
+            ('onehot', DaskOneHotEncoder(handle_unknown='error', sparse_output=False))
         ])
         binary_transformer = Pipeline(steps=[
             ('imputer', DaskSimpleImputer(strategy='most_frequent')),
             ('to_category', ToCategoricalDtype()),
-            ('onehot', DaskOneHotEncoder(handle_unknown='error'))
+            ('onehot', DaskOneHotEncoder(handle_unknown='error', sparse_output=False))
         ])
         preprocessor_class = DaskColumnTransformer
     else:
@@ -113,12 +111,7 @@ def preprocess_data(X_train, X_test, categorical_features, numerical_features, b
     X_train_processed = preprocessor.fit_transform(X_train)
     X_test_processed = preprocessor.transform(X_test)
 
-    # Only convert to numpy arrays if DASK_TYPE is 'local'
-    if DASK_TYPE == 'local':
-        if not isinstance(X_train_processed, np.ndarray):
-            X_train_processed = X_train_processed.toarray()
-        if not isinstance(X_test_processed, np.ndarray):
-            X_test_processed = X_test_processed.toarray()
+    
 
     processed_feature_names = get_feature_names(preprocessor)
 

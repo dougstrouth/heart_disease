@@ -6,8 +6,9 @@ import numpy as np
 import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
+from dask import persist
 from sklearn.model_selection import cross_val_score
-from dask_ml.model_selection import train_test_split # Import Dask-ML versions
+from sklearn.model_selection import train_test_split # Import scikit-learn version
 import dask.dataframe as dd # Import dask.dataframe for isinstance check
 
 from config import SHOW_PLOTS, VERBOSE_OUTPUT, DASK_TYPE, RUN_STACKED_ENSEMBLE, META_CLASSIFIER, CV_FOLDS, LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, RF_MIN_SAMPLES_SPLIT_OPTIONS, RF_MIN_SAMPLES_LEAF_OPTIONS, XGB_N_ESTIMATORS_OPTIONS, XGB_LEARNING_RATE_OPTIONS
@@ -111,23 +112,28 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
     X = combined_df.drop(TARGET_COLUMN, axis=1)
     y = combined_df[TARGET_COLUMN]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    # Convert to pandas for stratified split
+    X_pd = X.compute()
+    y_pd = y.compute()
+
+    # Ensure all missing values are np.nan for scikit-learn compatibility
+    X_pd = X_pd.mask(X_pd.isna(), np.nan)
+    y_pd = y_pd.mask(y_pd.isna(), np.nan)
+
+    X_train, X_test, y_train, y_test = train_test_split(X_pd, y_pd, test_size=0.2, random_state=42, stratify=y_pd)
     if verbose_output:
         logger.info("\nData split into training and testing sets.")
 
-    preprocessor = get_preprocessor(CATEGORICAL_FEATURES, NUMERICAL_FEATURES, BINARY_FEATURES)
+    preprocessor = get_preprocessor(CATEGORICAL_FEATURES, NUMERICAL_FEATURES, BINARY_FEATURES, use_dask_ml=False)
 
     X_train_processed = preprocessor.fit_transform(X_train)
     X_test_processed = preprocessor.transform(X_test)
 
-    # Persist processed data to Dask cluster memory
-    if hasattr(X_train_processed, 'persist'):
-        logger.info("Persisting X_train_processed and X_test_processed to Dask cluster memory...")
-        X_train_processed = X_train_processed.persist()
-        X_test_processed = X_test_processed.persist()
-        y_train = y_train.persist() # Persist y_train as well
-        y_test = y_test.persist() # Persist y_test as well
-        logger.info("Processed data persisted.")
+    # Persist Dask objects to cluster memory
+    if hasattr(y_train, 'persist'):
+        logger.info("Persisting y_train and y_test to Dask cluster memory...")
+        y_train, y_test = persist(y_train, y_test)
+        logger.info("y_train and y_test persisted.")
 
 
     feature_names = get_feature_names(preprocessor)

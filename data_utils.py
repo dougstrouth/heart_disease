@@ -179,22 +179,26 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
     for col in CATEGORICAL_FEATURES:
         if col in combined_df.columns:
             if is_dask:
-                # Dask's astype and fillna
-                combined_df[col] = combined_df[col].astype(str)
+                # Convert pd.NA to np.nan first, then fill np.nan with 'missing'
+                combined_df[col] = combined_df[col].replace(pd.NA, np.nan)
                 combined_df[col] = combined_df[col].fillna('missing')
+                combined_df[col] = combined_df[col].astype(str)
             else:
-                combined_df[col] = combined_df[col].astype(str)
+                combined_df[col] = combined_df[col].replace(pd.NA, np.nan)
                 combined_df[col] = combined_df[col].fillna('missing')
+                combined_df[col] = combined_df[col].astype(str)
             if verbose_output:
                 logger.info(f"Converted '{col}' to string and filled NaNs.")
 
     for col in BINARY_FEATURES:
         if col in combined_df.columns:
             if is_dask:
-                # Dask's to_numeric and fillna
+                # Convert pd.NA to np.nan first, then coerce to numeric
+                combined_df[col] = combined_df[col].replace(pd.NA, np.nan)
                 combined_df[col] = dd.to_numeric(combined_df[col], errors='coerce')
                 combined_df[col] = combined_df[col].fillna(0) # Fill NaNs with 0 for binary features
             else:
+                combined_df[col] = combined_df[col].replace(pd.NA, np.nan)
                 combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce')
                 combined_df[col] = combined_df[col].fillna(0) # Fill NaNs with 0 for binary features
             if verbose_output:
@@ -203,9 +207,13 @@ def combine_and_clean_data(df_synthetic, df_uci, verbose_output=False):
     for col in NUMERICAL_FEATURES:
         if col in combined_df.columns:
             if is_dask:
+                combined_df[col] = combined_df[col].replace(pd.NA, np.nan) # Use replace instead of fillna
                 combined_df[col] = dd.to_numeric(combined_df[col], errors='coerce')
+                combined_df[col] = combined_df[col].astype(float)
             else:
+                combined_df[col] = combined_df[col].replace(pd.NA, np.nan) # Use replace instead of fillna
                 combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce')
+                combined_df[col] = combined_df[col].astype(float)
             if verbose_output:
                 logger.info(f"Coerced '{col}' to numeric, converting errors to NaN.")
 
