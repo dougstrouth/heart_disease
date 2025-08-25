@@ -14,7 +14,7 @@ dependencies = [
     "joblib",
     "matplotlib>=3.10.5",
     "pandas>=2.3.2",
-    "scikit-learn>=1.5.0",
+    "scikit-learn<1.4",
     "seaborn>=0.13.2",
     "shap>=0.48.0",
     "tqdm>=4.67.1",
