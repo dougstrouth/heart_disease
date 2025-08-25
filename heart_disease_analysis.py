@@ -6,7 +6,9 @@ import numpy as np
 import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import cross_val_score
+from dask_ml.model_selection import train_test_split # Import Dask-ML versions
+import dask.dataframe as dd # Import dask.dataframe for isinstance check
 
 from config import SHOW_PLOTS, VERBOSE_OUTPUT, DASK_TYPE, RUN_STACKED_ENSEMBLE, META_CLASSIFIER, CV_FOLDS, LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, RF_MIN_SAMPLES_SPLIT_OPTIONS, RF_MIN_SAMPLES_LEAF_OPTIONS, XGB_N_ESTIMATORS_OPTIONS, XGB_LEARNING_RATE_OPTIONS
 from dask_utils import get_dask_client
@@ -54,16 +56,6 @@ def run_data_pipeline(verbose_output, show_plots):
 
         # Perform EDA and save combined file locally
         if combined_df is not None:
-            # Convert numerical features to float to ensure consistent NaN handling
-            for col in NUMERICAL_FEATURES:
-                if col in combined_df.columns:
-                    combined_df[col] = combined_df[col].astype(float)
-
-            # Convert numerical features to float to ensure consistent NaN handling
-            for col in NUMERICAL_FEATURES:
-                if col in combined_df.columns:
-                    combined_df[col] = combined_df[col].astype(float)
-
             perform_eda(combined_df, "Combined Dataset", NUMERICAL_FEATURES, CATEGORICAL_FEATURES, show_plots=show_plots, verbose_output=verbose_output)
 
             output_csv_path = "combined_heart_disease_dataset.csv"
@@ -90,11 +82,6 @@ def run_data_pipeline(verbose_output, show_plots):
 
         # Perform EDA and save combined file locally
         if combined_df is not None:
-            # Convert numerical features to float to ensure consistent NaN handling
-            for col in NUMERICAL_FEATURES:
-                if col in combined_df.columns:
-                    combined_df[col] = combined_df[col].astype(float)
-
             perform_eda(combined_df, "Combined Dataset", NUMERICAL_FEATURES, CATEGORICAL_FEATURES, show_plots=show_plots, verbose_output=verbose_output)
 
             output_csv_path = "combined_heart_disease_dataset.csv"
@@ -108,6 +95,12 @@ def run_data_pipeline(verbose_output, show_plots):
         logger.error(f"Unsupported DASK_TYPE: {DASK_TYPE}. Please use 'local', 'coiled', or 'cloud'.")
         combined_df = None
 
+    # Persist combined_df if it's a Dask DataFrame
+    if isinstance(combined_df, dd.DataFrame):
+        logger.info("Persisting combined_df to Dask cluster memory...")
+        combined_df = combined_df.persist()
+        logger.info("combined_df persisted.")
+
     return combined_df
 
 
@@ -118,10 +111,6 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
     X = combined_df.drop(TARGET_COLUMN, axis=1)
     y = combined_df[TARGET_COLUMN]
 
-    if DASK_TYPE == 'coiled':
-        X = X.compute()
-        y = y.compute()
-
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     if verbose_output:
         logger.info("\nData split into training and testing sets.")
@@ -130,6 +119,16 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
 
     X_train_processed = preprocessor.fit_transform(X_train)
     X_test_processed = preprocessor.transform(X_test)
+
+    # Persist processed data to Dask cluster memory
+    if hasattr(X_train_processed, 'persist'):
+        logger.info("Persisting X_train_processed and X_test_processed to Dask cluster memory...")
+        X_train_processed = X_train_processed.persist()
+        X_test_processed = X_test_processed.persist()
+        y_train = y_train.persist() # Persist y_train as well
+        y_test = y_test.persist() # Persist y_test as well
+        logger.info("Processed data persisted.")
+
 
     feature_names = get_feature_names(preprocessor)
 
@@ -299,7 +298,11 @@ def run_analysis():
                 mlflow.log_metric("stacked_cv_roc_auc", float(stacked_cv_mean))
 
             # Create a processed input example for MLflow logging
-            processed_input_example = preprocessor.transform(X[:5])
+            # Ensure it's a Dask DataFrame head if X_processed_full is Dask
+            if hasattr(X, 'head'):
+                processed_input_example = preprocessor.transform(X.head(5))
+            else:
+                processed_input_example = preprocessor.transform(X[:5])
 
             # Log models
             mlflow.sklearn.log_model(lr_model, name="logistic_regression_model", input_example=processed_input_example)  # type: ignore

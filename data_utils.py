@@ -21,7 +21,7 @@ def load_data(file_path):
     Loads a CSV file into a pandas or Dask DataFrame based on DASK_TYPE.
     """
     try:
-        if DASK_TYPE == 'coiled':
+        if DASK_TYPE == 'coiled' or DASK_TYPE == 'cloud': # Modified this line
             df = dd.read_csv(file_path, dtype={'cp': 'object', 'restecg': 'object', 'sex': 'object', 'slope': 'object'})
             logger.info(f"Successfully loaded Dask DataFrame from {file_path}")
         else:
@@ -79,7 +79,7 @@ def harmonize_datasets(df_synthetic, df_uci, verbose_output=False):
             df_uci_harmonized['thal'] = df_uci_harmonized['thal'].apply(lambda x: thal_mapping_uci_to_synthetic.get(x, np.nan), meta=('thal', 'float64'))
         else:
             df_uci_harmonized['thal'] = pd.to_numeric(df_uci_harmonized['thal'], errors='coerce')
-            df_uci_harmonized['thal'] = df_uci_harmonized['thal'].map(thal_mapping_uci_to_synthetic)
+            df_uci_harmonized['thal'] = df_uci_harmonized['thal'].map(thal_mapping_uci_to_synthetic) # Removed meta from here
         if verbose_output:
             logger.info("Re-encoded 'thal' column in UCI dataset and handled unmapped values.")
 

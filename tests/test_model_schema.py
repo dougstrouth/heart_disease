@@ -63,11 +63,13 @@ def processed_data_and_models(dummy_data):
 
     # Fit the preprocessor on the full training data to learn all categories
     preprocessor.fit(X_train)
-    # Transform a dummy row to get the number of features after transformation
-    expected_features = preprocessor.transform(X_train.head(1)).shape[1]
 
+    # Process X_train and X_test
     X_train_processed = preprocessor.transform(X_train)
     X_test_processed = preprocessor.transform(X_test)
+
+    # Get the number of features after transformation from the processed training data
+    expected_features = X_train_processed.shape[1]
 
     # Train dummy base models
     lr_model = Pipeline(steps=[('classifier', LogisticRegression(solver='liblinear', random_state=42))])

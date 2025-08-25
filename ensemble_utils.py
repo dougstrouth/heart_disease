@@ -35,8 +35,12 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
     for model_name, model in base_models.items():
         oof_preds = np.zeros(X_train.shape[0])
         for fold, (train_idx, val_idx) in enumerate(skf.split(X_train, y_train)):
-            fold_X_train, fold_y_train = X_train[train_idx], y_train.iloc[train_idx]
-            fold_X_val = X_train[val_idx]
+            if isinstance(X_train, pd.DataFrame):
+                fold_X_train, fold_y_train = X_train.iloc[train_idx], y_train.iloc[train_idx]
+                fold_X_val = X_train.iloc[val_idx]
+            else: # Assuming numpy array
+                fold_X_train, fold_y_train = X_train[train_idx], y_train.iloc[train_idx]
+                fold_X_val = X_train[val_idx]
 
             # Fit base model on fold training data
             model.fit(fold_X_train, fold_y_train)
@@ -97,4 +101,3 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
     }
 
     return meta_classifier, y_pred_stacked, y_proba_stacked, metrics, test_predictions
-

@@ -14,6 +14,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from xgboost import XGBClassifier
 
 from dask.distributed import Client
+import dask.dataframe as dd # Import dask.dataframe
 
 # Import configuration options
 from config import RF_RANDOM_SEARCH_N_ITER, LR_RANDOM_SEARCH_N_ITER, XGB_RANDOM_SEARCH_N_ITER, CV_FOLDS
@@ -31,55 +32,8 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_
         logger.error("Cannot train/evaluate: Data is None.")
         return None, None, None, None
 
-    # MLflow will handle model caching, so we can remove the joblib caching logic here
-    # cache_dir = "cache/models"
-    # os.makedirs(cache_dir, exist_ok=True)
-    # model_cache_path = os.path.join(cache_dir, f"{model_type}_model.joblib")
-
     best_model: Any
-    # if os.path.exists(model_cache_path) and not param_grid:
-    #     logger.info(f"\nLoading {model_type} model from cache...")
-    #     best_model = joblib.load(model_cache_path)
-    #     logger.info("Model loaded from cache.")
 
-    #     y_pred = best_model.predict(X_test)
-    #     y_proba = best_model.predict_proba(X_test)[:, 1]
-
-    #     accuracy = accuracy_score(y_test, y_pred)
-    #     precision = precision_score(y_test, y_pred)
-    #     recall = recall_score(y_test, y_pred)
-    #     f1 = f1_score(y_test, y_pred)
-    #     roc_auc = roc_auc_score(y_test, y_proba)
-    #     conf_matrix = confusion_matrix(y_test, y_pred)
-    #     class_report_dict = classification_report(y_test, y_pred, output_dict=True)
-
-    #     logger.info(f"\n--- {model_type} Model Evaluation (Loaded from Cache) ---")
-    #     logger.info(f"Accuracy: {accuracy:.4f}")
-    #     logger.info(f"Precision: {precision:.4f}")
-    #     logger.info(f"Recall: {recall:.4f}")
-    #     logger.info(f"F1-Score: {f1:.4f}")
-    #     logger.info(f"ROC AUC: {roc_auc:.4f}")
-
-    #     logger.info("\nConfusion Matrix:")
-    #     logger.info(conf_matrix)
-
-    #     logger.info("\nClassification Report:")
-    #     logger.info(classification_report(y_test, y_pred)) # Print readable format
-
-    #     metrics = {
-    #         'accuracy': accuracy,
-    #         'precision': precision,
-    #         'recall': recall,
-    #         'f1_score': f1,
-    #         'roc_auc': roc_auc,
-    #         'confusion_matrix': conf_matrix,
-    #         'classification_report': class_report_dict,
-    #         'best_params': None, # No grid search performed
-    #         'best_cv_score': None
-    #     }
-    #     return best_model, y_pred, y_proba, metrics
-
-    # else:
     if model_type == 'logistic_regression':
         classifier = LogisticRegression(solver='liblinear', random_state=42, max_iter=1000)
         model_name = "Logistic Regression"
@@ -131,15 +85,18 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_
         logger.info("Training complete.")
 
     # MLflow: Log the trained model
-    if model_type == 'logistic_regression':
-        mlflow.sklearn.log_model(best_model, name="logistic_regression_model", input_example=X_train_processed[:5])  # type: ignore
-    elif model_type == 'random_forest':
-        mlflow.sklearn.log_model(best_model, name="random_forest_model", input_example=X_train_processed[:5])  # type: ignore
-    elif model_type == 'xgboost':
-        mlflow.xgboost.log_model(best_model.named_steps['classifier'], name="xgboost_model", input_example=X_train_processed[:5])  # type: ignore
+    # Ensure input_example is a Dask DataFrame head if X_train_processed is Dask
+    if isinstance(X_train_processed, dd.DataFrame):
+        input_example_for_mlflow = X_train_processed.head(5)
+    else:
+        input_example_for_mlflow = X_train_processed[:5]
 
-    # joblib.dump(best_model, model_cache_path)
-    # logger.info(f"Model cached to {model_cache_path}")
+    if model_type == 'logistic_regression':
+        mlflow.sklearn.log_model(best_model, name="logistic_regression_model", input_example=input_example_for_mlflow)  # type: ignore
+    elif model_type == 'random_forest':
+        mlflow.sklearn.log_model(best_model, name="random_forest_model", input_example=input_example_for_mlflow)  # type: ignore
+    elif model_type == 'xgboost':
+        mlflow.xgboost.log_model(best_model.named_steps['classifier'], name="xgboost_model", input_example=input_example_for_mlflow)  # type: ignore
 
     y_pred = best_model.predict(X_test)
     y_proba = best_model.predict_proba(X_test)[:, 1]

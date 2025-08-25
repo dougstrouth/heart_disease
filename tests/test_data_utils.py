@@ -3,6 +3,7 @@ import os
 import dask.dataframe as dd # Import dask.dataframe
 from data_utils import load_data, harmonize_datasets, combine_and_clean_data # Import harmonize_datasets and combine_and_clean_data
 from config import DASK_TYPE # Import DASK_TYPE
+import numpy as np # Import numpy for np.nan
 
 # Define the path to the dummy data relative to the project root
 # This assumes the test is run from the project root or pytest is configured to find it.
@@ -16,7 +17,7 @@ def test_load_data_success():
     df = load_data(dummy_data_path)
     assert df is not None
 
-    if DASK_TYPE == 'coiled':
+    if DASK_TYPE == 'coiled' or DASK_TYPE == 'cloud': # Modified this line
         assert isinstance(df, dd.DataFrame)
         # For Dask DataFrames, we might need to compute to check shape and columns
         # Or check dask-specific properties
@@ -57,7 +58,7 @@ def test_harmonize_datasets():
     # Check if 'thal' re-encoding is correct in UCI dataset
     # Original UCI thal: 0, 1, 2 -> Synthetic thal: 3, 6, 7
     # We need to compute if it's a Dask DataFrame
-    if DASK_TYPE == 'coiled':
+    if DASK_TYPE == 'coiled' or DASK_TYPE == 'cloud': # Modified this line
         uci_thal_values = df_uci_harmonized['thal'].compute().tolist()
     else:
         uci_thal_values = df_uci_harmonized['thal'].tolist()
@@ -74,7 +75,7 @@ def test_harmonize_datasets():
 
     # Check if unique synthetic features are handled (imputed with 0) in UCI dataset
     # These are 'smoking', 'diabetes', 'bmi'
-    if DASK_TYPE == 'coiled':
+    if DASK_TYPE == 'coiled' or DASK_TYPE == 'cloud': # Modified this line
         uci_smoking_values = df_uci_harmonized['smoking'].compute().tolist()
         uci_diabetes_values = df_uci_harmonized['diabetes'].compute().tolist()
         uci_bmi_values = df_uci_harmonized['bmi'].compute().tolist()
@@ -99,7 +100,7 @@ def test_combine_and_clean_data_with_string_in_numeric_column():
         'fbs': [0], 'exang': [0], 'smoking': [0], 'diabetes': [0], 'heart_disease': [1], 'source': ['Synthetic']
     })
 
-    if DASK_TYPE == 'coiled':
+    if DASK_TYPE == 'coiled' or DASK_TYPE == 'cloud': # Modified this line
         df_dummy_second = dd.from_pandas(df_dummy_second, npartitions=1)
 
     combined_df = combine_and_clean_data(df_with_string, df_dummy_second)
@@ -107,7 +108,7 @@ def test_combine_and_clean_data_with_string_in_numeric_column():
     assert combined_df is not None
 
     # Check if 'chol' column is numeric and contains NaN where the string was
-    if DASK_TYPE == 'coiled':
+    if DASK_TYPE == 'coiled' or DASK_TYPE == 'cloud': # Modified this line
         chol_values = combined_df['chol'].compute().tolist()
         heart_disease_values = combined_df['heart_disease'].compute().tolist()
     else:

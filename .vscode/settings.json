@@ -1,4 +1,4 @@
 {
-    "CodeGPT.apiKey": "Anthropic",
+    "CodeGPT.apiKey": "Ollama",
     "python.analysis.autoImportCompletions": true
 }
