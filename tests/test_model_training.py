@@ -163,7 +163,7 @@ def test_train_evaluate_model_mlflow_logging(mock_mlflow):
         mock_instance.best_estimator_.predict.side_effect = lambda X: np.random.randint(0, 2, len(X))
         mock_instance.best_estimator_.predict_proba.side_effect = lambda X: np.random.rand(len(X), 2)
         mock_instance.best_score_ = 0.88
-        mock_instance.best_params_ = {'classifier__n_estimators': 100}
+        mock_instance.best_params_ = {'classifier__n_estimators': 100, 'classifier__learning_rate': 0.1}
         mock_randomized_search_cv.return_value = mock_instance
 
         train_evaluate_model(
@@ -176,7 +176,9 @@ def test_train_evaluate_model_mlflow_logging(mock_mlflow):
         )
 
         # Assert MLflow logging calls for XGBoost
-        mock_log_param.assert_called_once_with('xgboost_classifier__n_estimators', 100)
+        mock_log_param.assert_any_call('xgboost_classifier__n_estimators', 100)
+        mock_log_param.assert_any_call('xgboost_classifier__learning_rate', 0.1)
+        assert mock_log_param.call_count == 2
         mock_log_metric.assert_any_call('xgboost_best_cv_roc_auc', 0.88)
         # Assert that accuracy is logged, but don't check the exact value due to randomness
         mock_log_metric.assert_any_call('xgboost_accuracy', ANY)
