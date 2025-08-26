@@ -28,7 +28,7 @@ class ToCategoricalDtype(BaseEstimator, TransformerMixin):
         else: # Dask DataFrame
             return X.astype('category')
 
-def get_preprocessor(categorical_features, numerical_features, binary_features, use_dask_ml=None):
+def get_preprocessor(categorical_features, numerical_features, use_dask_ml=None):
     """
     Creates and returns a ColumnTransformer for preprocessing.
     Conditionally uses Dask-ML preprocessors if DASK_TYPE is not 'local'.
@@ -47,11 +47,6 @@ def get_preprocessor(categorical_features, numerical_features, binary_features, 
             ('to_category', ToCategoricalDtype()), # Use custom transformer
             ('onehot', DaskOneHotEncoder(handle_unknown='error', sparse_output=False))
         ])
-        binary_transformer = Pipeline(steps=[
-            ('imputer', DaskSimpleImputer(strategy='most_frequent')),
-            ('to_category', ToCategoricalDtype()),
-            ('onehot', DaskOneHotEncoder(handle_unknown='error', sparse_output=False))
-        ])
         preprocessor_class = DaskColumnTransformer
     else:
         numerical_transformer = Pipeline(steps=[
@@ -63,17 +58,12 @@ def get_preprocessor(categorical_features, numerical_features, binary_features, 
             ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
             ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
         ])
-        binary_transformer = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='most_frequent')),
-            ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False, drop='if_binary'))
-        ])
         preprocessor_class = ColumnTransformer
 
     preprocessor = preprocessor_class(
         transformers=[
             ('num', numerical_transformer, numerical_features),
-            ('cat', categorical_transformer, categorical_features),
-            ('bin', binary_transformer, binary_features)
+            ('cat', categorical_transformer, categorical_features)
         ],
         remainder='drop'
     )
@@ -101,12 +91,12 @@ def get_feature_names(preprocessor):
             feature_names.extend(features)
     return feature_names
 
-def preprocess_data(X_train, X_test, categorical_features, numerical_features, binary_features):
+def preprocess_data(X_train, X_test, categorical_features, numerical_features):
     """
     Applies preprocessing to training and testing data.
     Returns Dask Dataframes if DASK_TYPE is not 'local', otherwise NumPy arrays.
     """
-    preprocessor = get_preprocessor(categorical_features, numerical_features, binary_features)
+    preprocessor = get_preprocessor(categorical_features, numerical_features)
     
     X_train_processed = preprocessor.fit_transform(X_train)
     X_test_processed = preprocessor.transform(X_test)

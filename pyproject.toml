@@ -8,7 +8,7 @@ dependencies = [
     "coiled>=1.118.3",
     "dask-kubernetes>=2025.7.0",
     "dask-ml",
-    "dask[complete]>=2025.7.0",
+    "dask[complete,dataframe]>=2025.7.0",
     "gcsfs==2025.3.0",
     "ipykernel>=6.30.1",
     "joblib",

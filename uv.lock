@@ -1368,7 +1368,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "coiled" },
-    { name = "dask", extra = ["complete"] },
+    { name = "dask", extra = ["complete", "dataframe"] },
     { name = "dask-kubernetes" },
     { name = "dask-ml" },
     { name = "gcsfs" },
@@ -1393,7 +1393,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "coiled", specifier = ">=1.118.3" },
-    { name = "dask", extras = ["complete"], specifier = ">=2025.7.0" },
+    { name = "dask", extras = ["complete", "dataframe"], specifier = ">=2025.7.0" },
     { name = "dask-kubernetes", specifier = ">=2025.7.0" },
     { name = "dask-ml" },
     { name = "gcsfs", specifier = "==2025.3.0" },

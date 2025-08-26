@@ -51,7 +51,6 @@ The authors of the databases have requested that any publications resulting from
 
 
 /Users/dougstrouth/Documents/datasets/kaggle_data_sets/data/pratyushpuri/heart-disease-dataset-3k-rows-python-code-2025/heart_disease_dataset.csv
-
 About Dataset
 Heart Disease Dataset Documentation
 

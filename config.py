@@ -6,6 +6,9 @@ VERBOSE_OUTPUT = False # Set to True for more detailed print statements
 # Dask type can be 'local', 'coiled', or 'cloud'. 'cloud' uses a local Dask client but loads data from GCS.
 DASK_TYPE = 'cloud'
 
+# --- GCS Configuration ---
+GCS_DATA_PATH = "gs://my-heart-disease-data-bucket/data/combined_heart_disease_dataset_3.csv"
+
 # --- Configuration for Automated Parameter Search ---
 TARGET_RUN_TIME_MINUTES = 5.0  # Target maximum runtime for the full analysis
 MAX_SEARCH_TIME_MINUTES = 5.0 # Maximum time to spend searching for optimal parameters
@@ -34,5 +37,6 @@ CV_FOLDS = 5 # Number of cross-validation folds for GridSearchCV/RandomizedSearc
 
 # --- Configuration for Stacked Ensemble ---
 RUN_STACKED_ENSEMBLE = True # Set to True to run the stacked ensemble
+RUN_MODELING = True # Set to True to run the modeling pipeline
 # Define the meta-classifier for the stacked ensemble
 META_CLASSIFIER = LogisticRegression(solver='liblinear', random_state=42)
