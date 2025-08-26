@@ -1,12 +1,9 @@
 import time
-import logging
-import pandas as pd
 import dask.dataframe as dd
 
 
-from pandas_data_utils import get_processed_data as pandas_get_processed_data
+from pandas_data_utils import get_processed_data as pandas_get_processed_data, perform_eda
 from dask_data_utils import get_processed_data as dask_get_processed_data
-from data_utils import perform_eda
 from data_schema import HeartDiseaseSchema
 from utils.logger_config import setup_logging
 from modeling import run_model_pipeline, perform_final_model_evaluation, log_analysis_results
@@ -54,9 +51,9 @@ def run_analysis():
     if processed_df is not None:
         # If using dask, compute the dataframe for EDA
         if isinstance(processed_df, dd.DataFrame):
-            perform_eda(processed_df.compute(), "Combined Dataset", HeartDiseaseSchema.NUMERICAL_COLUMNS, HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE, show_plots=SHOW_PLOTS, verbose_output=VERBOSE_OUTPUT)
+                        perform_eda(processed_df.compute(), "Combined Dataset", HeartDiseaseSchema.NUMERICAL_COLUMNS(), HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE(), show_plots=SHOW_PLOTS, verbose_output=VERBOSE_OUTPUT)
         else:
-            perform_eda(processed_df, "Combined Dataset", HeartDiseaseSchema.NUMERICAL_COLUMNS, HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE, show_plots=SHOW_PLOTS, verbose_output=VERBOSE_OUTPUT)
+            perform_eda(processed_df, "Combined Dataset", HeartDiseaseSchema.NUMERICAL_COLUMNS(), HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE(), show_plots=SHOW_PLOTS, verbose_output=VERBOSE_OUTPUT)
 
     dask_client = None
     # Always create a Dask client based on DASK_TYPE
@@ -100,7 +97,7 @@ def run_analysis():
             # Log models
             mlflow.sklearn.log_model(lr_model, name="logistic_regression_model", input_example=processed_input_example)
             mlflow.sklearn.log_model(rf_model, name="random_forest_model", input_example=processed_input_example)
-            mlflow.xgboost.log_model(xgb_model.named_steps['classifier'], name="xgboost_model", input_example=processed_input_example, xgb_model_kwargs={"json_format": True})
+            mlflow.xgboost.log_model(xgb_model.named_steps['classifier'], name="xgboost_model", input_example=processed_input_example)
             if True and stacked_model is not None:
                 mlflow.sklearn.log_model(stacked_model, name="stacked_ensemble_model", input_example=stacked_input_example[:5])
         

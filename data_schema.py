@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, ClassVar
 
 class HeartDiseaseSchema:
     """
@@ -9,20 +9,20 @@ class HeartDiseaseSchema:
     # Define expected column names and their data types
     COLUMNS: Dict[str, type] = {
         "age": int,
-        "sex": int, # Will be mapped to categorical later
-        "cp": int,  # Will be mapped to categorical later
+        "sex": object, # Will be mapped to categorical later
+        "cp": object,  # Will be mapped to categorical later
         "trestbps": int,
         "chol": int,
-        "fbs": int, # Will be mapped to categorical later
-        "restecg": int, # Will be mapped to categorical later
+        "fbs": object, # Will be mapped to categorical later
+        "restecg": object, # Will be mapped to categorical later
         "thalach": int,
-        "exang": int, # Will be mapped to categorical later
+        "exang": object, # Will be mapped to categorical later
         "oldpeak": float,
-        "slope": int, # Will be mapped to categorical later
-        "ca": int,  # Will be mapped to categorical later
-        "thal": int, # Will be mapped to categorical later
-        "smoking": int, # Will be mapped to categorical later
-        "diabetes": int, # Will be mapped to categorical later
+        "slope": object, # Will be mapped to categorical later
+        "ca": object,  # Will be mapped to categorical later
+        "thal": object, # Will be mapped to categorical later
+        "smoking": object, # Will be mapped to categorical later
+        "diabetes": object, # Will be mapped to categorical later
         "bmi": float,
         "heart_disease": int, # Target variable
     }
@@ -72,14 +72,14 @@ class HeartDiseaseSchema:
         "bmi": (10.0, 60.0), # Typical BMI range
     }
 
-# Define these outside the class and then assign them as class attributes
-_CATEGORICAL_COLUMNS_TO_ENCODE: List[str] = list(HeartDiseaseSchema.CATEGORICAL_MAPPINGS.keys())
-HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE = _CATEGORICAL_COLUMNS_TO_ENCODE
+    COLUMN_ORDER: ClassVar[List[str]] = list(COLUMNS.keys())
 
-_NUMERICAL_COLUMNS: List[str] = [
-    col for col, dtype in HeartDiseaseSchema.COLUMNS.items() if dtype in [int, float] and col not in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE and col != HeartDiseaseSchema.TARGET_COLUMN
-]
-HeartDiseaseSchema.NUMERICAL_COLUMNS = _NUMERICAL_COLUMNS
+    @staticmethod
+    def CATEGORICAL_COLUMNS_TO_ENCODE() -> List[str]:
+        return list(HeartDiseaseSchema.CATEGORICAL_MAPPINGS.keys())
 
-_COLUMN_ORDER: List[str] = list(HeartDiseaseSchema.COLUMNS.keys())
-HeartDiseaseSchema.COLUMN_ORDER = _COLUMN_ORDER
+    @staticmethod
+    def NUMERICAL_COLUMNS() -> List[str]:
+        return [
+            col for col, dtype in HeartDiseaseSchema.COLUMNS.items() if dtype in [int, float] and col not in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE() and col != HeartDiseaseSchema.TARGET_COLUMN
+        ]

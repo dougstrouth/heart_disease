@@ -2,16 +2,12 @@
 import time
 import logging
 import joblib
-import pandas as pd
 import numpy as np
-import mlflow
-import mlflow.sklearn
-import mlflow.xgboost
 from dask import persist
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import train_test_split # Import scikit-learn version
 
-from config import RUN_STACKED_ENSEMBLE, META_CLASSIFIER, CV_FOLDS, LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, RF_MIN_SAMPLES_SPLIT_OPTIONS, RF_MIN_SAMPLES_LEAF_OPTIONS, XGB_N_ESTIMATORS_OPTIONS, XGB_LEARNING_RATE_OPTIONS
+from config import CV_FOLDS, LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, RF_MIN_SAMPLES_SPLIT_OPTIONS, RF_MIN_SAMPLES_LEAF_OPTIONS, XGB_N_ESTIMATORS_OPTIONS, XGB_LEARNING_RATE_OPTIONS
 from data_schema import HeartDiseaseSchema
 from model_training import train_evaluate_model
 from ensemble_utils import train_stacked_model
@@ -46,7 +42,8 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
     if verbose_output:
         logger.info("\nData split into training and testing sets.")
 
-    preprocessor = get_preprocessor(HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE, HeartDiseaseSchema.NUMERICAL_COLUMNS, use_dask_ml=False)
+    binary_features = ['sex', 'fbs', 'exang', 'smoking', 'diabetes']
+    preprocessor = get_preprocessor(HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE(), HeartDiseaseSchema.NUMERICAL_COLUMNS(), binary_features, use_dask_ml=False)
 
     X_train_processed = preprocessor.fit_transform(X_train)
     X_test_processed = preprocessor.transform(X_test)

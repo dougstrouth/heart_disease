@@ -9,23 +9,23 @@ from data_schema import HeartDiseaseSchema
 
 TARGET_COLUMN = HeartDiseaseSchema.TARGET_COLUMN
 
-def load_and_harmonize_uci(file_path):
+def load_and_harmonize_uci(file_path, schema_dtypes):
     """Loads and harmonizes the UCI heart disease dataset."""
-    df = pd.read_csv(file_path, na_values=['?'])
+    df = pd.read_csv(file_path, na_values=['?'], dtype=schema_dtypes)
     df = df.rename(columns={'num': 'target'})
     df['origin'] = 'uci'
     return df
 
-def load_and_harmonize_synthetic(file_path):
+def load_and_harmonize_synthetic(file_path, schema_dtypes):
     """Loads and harmonizes the synthetic heart disease dataset."""
-    df = pd.read_csv(file_path, na_values=['?'])
+    df = pd.read_csv(file_path, na_values=['?'], dtype=schema_dtypes)
     df = df.rename(columns={'heart_disease': 'target'})
     df['origin'] = 'synthetic'
     return df
 
-def load_and_harmonize_johnsmith(file_path):
+def load_and_harmonize_johnsmith(file_path, schema_dtypes):
     """Loads and harmonizes the John Smith heart disease dataset."""
-    df = pd.read_csv(file_path, na_values=['?'])
+    df = pd.read_csv(file_path, na_values=['?'], dtype=schema_dtypes)
     # No target column rename needed for this dataset as it's already named 'target'
     df['origin'] = 'johnsmith'
     return df
@@ -57,9 +57,20 @@ def preprocess_data(df):
 
 def get_processed_data(uci_path, synthetic_path, johnsmith_path):
     """Main function to load, harmonize, and preprocess the datasets."""
-    uci_df = load_and_harmonize_uci(uci_path)
-    synthetic_df = load_and_harmonize_synthetic(synthetic_path)
-    johnsmith_df = load_and_harmonize_johnsmith(johnsmith_path)
+    schema_dtypes = {}
+    for col, col_type in HeartDiseaseSchema.COLUMNS.items():
+        if col in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE():
+            schema_dtypes[col] = object # Load as object if it's a categorical column
+        elif isinstance(col_type, type) and issubclass(col_type, int):
+            schema_dtypes[col] = pd.Int64Dtype() # Use nullable integer type for non-categorical ints
+        elif isinstance(col_type, type) and issubclass(col_type, float):
+            schema_dtypes[col] = np.float64
+        else:
+            schema_dtypes[col] = object
+
+    uci_df = load_and_harmonize_uci(uci_path, schema_dtypes)
+    synthetic_df = load_and_harmonize_synthetic(synthetic_path, schema_dtypes)
+    johnsmith_df = load_and_harmonize_johnsmith(johnsmith_path, schema_dtypes)
 
     combined_df = combine_datasets(uci_df, synthetic_df, johnsmith_df)
     processed_df = preprocess_data(combined_df)

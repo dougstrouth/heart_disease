@@ -27,8 +27,8 @@ logger.info("\nPerforming EDA on the Dask DataFrame...")
 perform_eda(
     ddf,
     "Combined Dataset (Dask)",
-    numerical_features=HeartDiseaseSchema.NUMERICAL_COLUMNS,
-    categorical_features=HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE,
+    numerical_features=HeartDiseaseSchema.NUMERICAL_COLUMNS(),
+    categorical_features=HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE(),
     show_plots=False,
     verbose_output=True
 )

@@ -28,7 +28,7 @@ class ToCategoricalDtype(BaseEstimator, TransformerMixin):
         else: # Dask DataFrame
             return X.astype('category')
 
-def get_preprocessor(categorical_features, numerical_features, use_dask_ml=None):
+def get_preprocessor(categorical_features, numerical_features, binary_features, use_dask_ml=None):
     """
     Creates and returns a ColumnTransformer for preprocessing.
     Conditionally uses Dask-ML preprocessors if DASK_TYPE is not 'local'.
@@ -60,10 +60,13 @@ def get_preprocessor(categorical_features, numerical_features, use_dask_ml=None)
         ])
         preprocessor_class = ColumnTransformer
 
+    # Combine categorical and binary features for the categorical transformer
+    all_categorical_features = list(set(categorical_features + binary_features))
+
     preprocessor = preprocessor_class(
         transformers=[
             ('num', numerical_transformer, numerical_features),
-            ('cat', categorical_transformer, categorical_features)
+            ('cat', categorical_transformer, all_categorical_features)
         ],
         remainder='drop'
     )

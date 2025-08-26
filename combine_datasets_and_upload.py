@@ -3,10 +3,9 @@ import pandas as pd
 import numpy as np
 import dask.dataframe as dd
 
-import config # Import the config module
-from data_utils import combine_and_clean_data, TARGET_COLUMN
 from utils.logger_config import setup_logging
 from data_schema import HeartDiseaseSchema # Import HeartDiseaseSchema for dtypes
+from pandas_data_utils import load_and_harmonize_uci, load_and_harmonize_synthetic, load_and_harmonize_johnsmith, combine_datasets, preprocess_data
 
 def combine_and_save_all_datasets(output_csv_path="combined_heart_disease_dataset.csv"):
     logger = setup_logging()
@@ -21,7 +20,7 @@ def combine_and_save_all_datasets(output_csv_path="combined_heart_disease_datase
     # Prepare dtype mapping for pandas read_csv
     schema_dtypes = {}
     for col, col_type in HeartDiseaseSchema.COLUMNS.items():
-        if col in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE:
+        if col in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE():
             schema_dtypes[col] = object # Load as object if it's a categorical column
         elif isinstance(col_type, type) and issubclass(col_type, int):
             schema_dtypes[col] = pd.Int64Dtype() # Use nullable integer type for non-categorical ints
@@ -68,24 +67,27 @@ def combine_and_save_all_datasets(output_csv_path="combined_heart_disease_datase
         logger.error("One or more datasets failed to load. Exiting.")
         return None
 
-    # Rename 'target' column to 'heart_disease' in df_johnsmith88 for harmonization
-    # This step was originally in heart_disease_analysis.py
-    if 'target' in df_johnsmith88.columns:
-        df_johnsmith88 = df_johnsmith88.rename(columns={'target': TARGET_COLUMN})
-        logger.info(f"Renamed 'target' to '{TARGET_COLUMN}' in df_johnsmith88.")
+    # Harmonize individual datasets
+    df_pratyushpuri_harmonized = load_and_harmonize_synthetic(file_path_pratyushpuri)
+    df_edwankarimsony_harmonized = load_and_harmonize_uci(file_path_edwankarimsony)
+    df_johnsmith88_harmonized = load_and_harmonize_johnsmith(file_path_johnsmith88)
 
-    logger.info("Harmonizing and combining initial two datasets...")
-    combined_df_initial = combine_and_clean_data(df_pratyushpuri, df_edwankarimsony, verbose_output=config.VERBOSE_OUTPUT)
-
-    if combined_df_initial is None:
-        logger.error("Initial combination failed. Exiting.")
+    if any(df is None for df in [df_pratyushpuri_harmonized, df_edwankarimsony_harmonized, df_johnsmith88_harmonized]):
+        logger.error("One or more datasets failed to harmonize. Exiting.")
         return None
 
-    logger.info("Harmonizing and combining with the third dataset...")
-    final_combined_df = combine_and_clean_data(combined_df_initial, df_johnsmith88, verbose_output=config.VERBOSE_OUTPUT)
+    logger.info("Combining harmonized datasets...")
+    combined_df = combine_datasets(df_edwankarimsony_harmonized, df_pratyushpuri_harmonized, df_johnsmith88_harmonized)
+
+    if combined_df is None:
+        logger.error("Dataset combination failed. Exiting.")
+        return None
+
+    logger.info("Preprocessing combined dataset...")
+    final_combined_df = preprocess_data(combined_df)
 
     if final_combined_df is None:
-        logger.error("Final combination failed. Exiting.")
+        logger.error("Preprocessing failed. Exiting.")
         return None
 
     logger.info(f"Final combined DataFrame has {len(final_combined_df)} rows.")

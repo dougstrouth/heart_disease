@@ -39,7 +39,7 @@ def dummy_data():
     df = pd.DataFrame(data)
 
     # Explicitly convert categorical and binary columns to object (string) dtype
-    for col in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE:
+    for col in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE():
         if col in df.columns:
             df[col] = df[col].astype(str)
 
@@ -53,10 +53,10 @@ def processed_data_and_models(dummy_data):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
     # Define features based on HeartDiseaseSchema
-    NUMERICAL_FEATURES = HeartDiseaseSchema.NUMERICAL_COLUMNS
-    CATEGORICAL_FEATURES = HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE
+    NUMERICAL_FEATURES = HeartDiseaseSchema.NUMERICAL_COLUMNS()
+    CATEGORICAL_FEATURES = HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE()
     # Identify binary features from the schema's categorical mappings
-    BINARY_FEATURES = [col for col in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE if col in ["fbs", "exang", "smoking", "diabetes"]]
+    BINARY_FEATURES = [col for col in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE() if col in ["fbs", "exang", "smoking", "diabetes"]]
 
     preprocessor = get_preprocessor(CATEGORICAL_FEATURES, NUMERICAL_FEATURES, BINARY_FEATURES, use_dask_ml=False)
 
