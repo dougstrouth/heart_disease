@@ -6,10 +6,17 @@ from xgboost import XGBClassifier
 SHOW_PLOTS = False  # Set to True to display plots, False to suppress them
 VERBOSE_OUTPUT = False # Set to True for more detailed print statements
 # Dask type can be 'local', 'coiled', or 'cloud'. 'cloud' uses a local Dask client but loads data from GCS.
-DASK_TYPE = 'coiled'
+DASK_TYPE = 'cloud'
 
 # --- GCS Configuration ---
 GCS_DATA_PATH = "gs://my-heart-disease-data-bucket/data/combined_heart_disease_dataset_3.csv"
+
+# --- MLflow Configuration ---
+# Set this environment variable in your terminal before running the script:
+# export MLFLOW_TRACKING_URI="gs://my-heart-disease-data-bucket/mlruns"
+# or for Windows: set MLFLOW_TRACKING_URI=gs://my-heart-disease-data-bucket/mlruns
+# This will store both MLflow metadata and artifacts in the specified GCS bucket.
+MLFLOW_GCS_TRACKING_URI = "gs://my-heart-disease-data-bucket/mlruns"
 
 # --- Configuration for Automated Parameter Search ---
 TARGET_RUN_TIME_MINUTES = 5.0  # Target maximum runtime for the full analysis
