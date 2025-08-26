@@ -7,7 +7,11 @@ from dask import persist
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import train_test_split # Import scikit-learn version
 
-from config import CV_FOLDS, LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, RF_MIN_SAMPLES_SPLIT_OPTIONS, RF_MIN_SAMPLES_LEAF_OPTIONS, XGB_N_ESTIMATORS_OPTIONS, XGB_LEARNING_RATE_OPTIONS
+from config import (
+    DASK_TYPE, CV_FOLDS, LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, RF_MIN_SAMPLES_SPLIT_OPTIONS, RF_MIN_SAMPLES_LEAF_OPTIONS, XGB_N_ESTIMATORS_OPTIONS, XGB_LEARNING_RATE_OPTIONS,
+    COILED_LR_C_OPTIONS, COILED_RF_N_ESTIMATORS_OPTIONS, COILED_RF_MAX_DEPTH_OPTIONS, COILED_RF_MIN_SAMPLES_SPLIT_OPTIONS, COILED_RF_MIN_SAMPLES_LEAF_OPTIONS,
+    COILED_XGB_N_ESTIMATORS_OPTIONS, COILED_XGB_LEARNING_RATE_OPTIONS
+)
 from data_schema import HeartDiseaseSchema
 from model_training import train_evaluate_model
 from ensemble_utils import train_stacked_model
@@ -57,23 +61,41 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
 
     feature_names = get_feature_names(preprocessor)
 
+    # Determine which parameter options to use based on DASK_TYPE
+    if DASK_TYPE in ['coiled', 'cloud']:
+        current_lr_c_options = COILED_LR_C_OPTIONS
+        current_rf_n_estimators_options = COILED_RF_N_ESTIMATORS_OPTIONS
+        current_rf_max_depth_options = COILED_RF_MAX_DEPTH_OPTIONS
+        current_rf_min_samples_split_options = COILED_RF_MIN_SAMPLES_SPLIT_OPTIONS
+        current_rf_min_samples_leaf_options = COILED_RF_MIN_SAMPLES_LEAF_OPTIONS
+        current_xgb_n_estimators_options = COILED_XGB_N_ESTIMATORS_OPTIONS
+        current_xgb_learning_rate_options = COILED_XGB_LEARNING_RATE_OPTIONS
+    else:
+        current_lr_c_options = LR_C_OPTIONS
+        current_rf_n_estimators_options = RF_N_ESTIMATORS_OPTIONS
+        current_rf_max_depth_options = RF_MAX_DEPTH_OPTIONS
+        current_rf_min_samples_split_options = RF_MIN_SAMPLES_SPLIT_OPTIONS
+        current_rf_min_samples_leaf_options = RF_MIN_SAMPLES_LEAF_OPTIONS
+        current_xgb_n_estimators_options = XGB_N_ESTIMATORS_OPTIONS
+        current_xgb_learning_rate_options = XGB_LEARNING_RATE_OPTIONS
+
     # Logistic Regression
-    lr_param_grid = {'classifier__C': LR_C_OPTIONS}
+    lr_param_grid = {'classifier__C': current_lr_c_options}
     lr_model, _, _, lr_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='logistic_regression', param_grid=lr_param_grid, dask_client=dask_client)
 
     # Random Forest
     rf_param_grid = {
-        'classifier__n_estimators': RF_N_ESTIMATORS_OPTIONS,
-        'classifier__max_depth': RF_MAX_DEPTH_OPTIONS,
-        'classifier__min_samples_split': RF_MIN_SAMPLES_SPLIT_OPTIONS,
-        'classifier__min_samples_leaf': RF_MIN_SAMPLES_LEAF_OPTIONS
+        'classifier__n_estimators': current_rf_n_estimators_options,
+        'classifier__max_depth': current_rf_max_depth_options,
+        'classifier__min_samples_split': current_rf_min_samples_split_options,
+        'classifier__min_samples_leaf': current_rf_min_samples_leaf_options
     }
     rf_model, _, _, rf_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='random_forest', param_grid=rf_param_grid, dask_client=dask_client)
 
     # XGBoost
     xgb_param_grid = {
-        'classifier__n_estimators': XGB_N_ESTIMATORS_OPTIONS,
-        'classifier__learning_rate': XGB_LEARNING_RATE_OPTIONS
+        'classifier__n_estimators': current_xgb_n_estimators_options,
+        'classifier__learning_rate': current_xgb_learning_rate_options
     }
     xgb_model, _, _, xgb_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='xgboost', param_grid=xgb_param_grid, dask_client=dask_client)
 

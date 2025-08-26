@@ -17,6 +17,18 @@ def run_analysis():
     logger.info("--- Starting Heart Disease Analysis ---")
     start_time = time.time()
 
+    # Configure MLflow to log artifacts to GCS.
+    # The tracking URI (for metadata) will use the default MLflow tracking server (Coiled's or local 'mlruns').
+    mlflow.set_artifact_uri("gs://my-heart-disease-data-bucket/mlflow-artifacts")
+
+    if DASK_TYPE in ['coiled', 'cloud']:
+        from config import GCS_DATA_PATH
+        logger.info(f"Using Dask to process data from GCS: {GCS_DATA_PATH}")
+
+    if DASK_TYPE in ['coiled', 'cloud']:
+        from config import GCS_DATA_PATH
+        logger.info(f"Using Dask to process data from GCS: {GCS_DATA_PATH}")
+
     if DASK_TYPE in ['coiled', 'cloud']:
         from config import GCS_DATA_PATH
         logger.info(f"Using Dask to process data from GCS: {GCS_DATA_PATH}")

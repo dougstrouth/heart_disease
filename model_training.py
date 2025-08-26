@@ -17,7 +17,10 @@ from dask.distributed import Client
 import dask.dataframe as dd # Import dask.dataframe
 
 # Import configuration options
-from config import RF_RANDOM_SEARCH_N_ITER, LR_RANDOM_SEARCH_N_ITER, XGB_RANDOM_SEARCH_N_ITER, CV_FOLDS
+from config import DASK_TYPE, RF_RANDOM_SEARCH_N_ITER, LR_RANDOM_SEARCH_N_ITER, XGB_RANDOM_SEARCH_N_ITER, CV_FOLDS, \
+    COILED_LR_C_OPTIONS, COILED_RF_N_ESTIMATORS_OPTIONS, COILED_RF_MAX_DEPTH_OPTIONS, COILED_RF_MIN_SAMPLES_SPLIT_OPTIONS, COILED_RF_MIN_SAMPLES_LEAF_OPTIONS, \
+    COILED_XGB_N_ESTIMATORS_OPTIONS, COILED_XGB_LEARNING_RATE_OPTIONS, \
+    COILED_RF_RANDOM_SEARCH_N_ITER, COILED_LR_RANDOM_SEARCH_N_ITER, COILED_XGB_RANDOM_SEARCH_N_ITER
 
 
 # Import stacking utility
@@ -51,14 +54,70 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_
 
     if param_grid:
         logger.info(f"\nPerforming GridSearchCV for {model_name}...")
-        if model_type == 'random_forest':
-            search = RandomizedSearchCV(model_pipeline, param_grid, cv=CV_FOLDS, scoring='roc_auc', n_iter=RF_RANDOM_SEARCH_N_ITER, n_jobs=-1, verbose=1)
-        elif model_type == 'logistic_regression':
-            search = RandomizedSearchCV(model_pipeline, param_grid, cv=CV_FOLDS, scoring='roc_auc', n_iter=LR_RANDOM_SEARCH_N_ITER, n_jobs=1, verbose=1) # Changed n_jobs to 1 for liblinear solver
-        elif model_type == 'xgboost':
-            search = RandomizedSearchCV(model_pipeline, param_grid, cv=CV_FOLDS, scoring='roc_auc', n_iter=XGB_RANDOM_SEARCH_N_ITER, n_jobs=-1, verbose=1)
+
+        # Determine which parameter options and n_iter to use based on DASK_TYPE
+        if DASK_TYPE in ['coiled', 'cloud']:
+            lr_c_options = COILED_LR_C_OPTIONS
+            rf_n_estimators_options = COILED_RF_N_ESTIMATORS_OPTIONS
+            rf_max_depth_options = COILED_RF_MAX_DEPTH_OPTIONS
+            rf_min_samples_split_options = COILED_RF_MIN_SAMPLES_SPLIT_OPTIONS
+            rf_min_samples_leaf_options = COILED_RF_MIN_SAMPLES_LEAF_OPTIONS
+            xgb_n_estimators_options = COILED_XGB_N_ESTIMATORS_OPTIONS
+            xgb_learning_rate_options = COILED_XGB_LEARNING_RATE_OPTIONS
+            rf_n_iter = COILED_RF_RANDOM_SEARCH_N_ITER
+            lr_n_iter = COILED_LR_RANDOM_SEARCH_N_ITER
+            xgb_n_iter = COILED_XGB_RANDOM_SEARCH_N_ITER
         else:
-            search = GridSearchCV(model_pipeline, param_grid, cv=CV_FOLDS, scoring='roc_auc', n_jobs=-1, verbose=1)
+            # Use default options from config for local/pandas runs
+            lr_c_options = param_grid.get('classifier__C', LR_C_OPTIONS) # Assuming param_grid might contain these
+            rf_n_estimators_options = param_grid.get('classifier__n_estimators', RF_N_ESTIMATORS_OPTIONS)
+            rf_max_depth_options = param_grid.get('classifier__max_depth', RF_MAX_DEPTH_OPTIONS)
+            rf_min_samples_split_options = param_grid.get('classifier__min_samples_split', RF_MIN_SAMPLES_SPLIT_OPTIONS)
+            rf_min_samples_leaf_options = param_grid.get('classifier__min_samples_leaf', RF_MIN_SAMPLES_LEAF_OPTIONS)
+            xgb_n_estimators_options = param_grid.get('classifier__n_estimators', XGB_N_ESTIMATORS_OPTIONS)
+            xgb_learning_rate_options = param_grid.get('classifier__learning_rate', XGB_LEARNING_RATE_OPTIONS)
+            rf_n_iter = RF_RANDOM_SEARCH_N_ITER
+            lr_n_iter = LR_RANDOM_SEARCH_N_ITER
+            xgb_n_iter = XGB_RANDOM_SEARCH_N_ITER
+
+        # Reconstruct param_grid based on selected options
+        current_param_grid = {}
+        if model_type == 'logistic_regression':
+            current_param_grid = {'classifier__C': lr_c_options}
+            n_iter_to_use = lr_n_iter
+        elif model_type == 'random_forest':
+            current_param_grid = {
+                'classifier__n_estimators': rf_n_estimators_options,
+                'classifier__max_depth': rf_max_depth_options,
+                'classifier__min_samples_split': rf_min_samples_split_options,
+                'classifier__min_samples_leaf': rf_min_samples_leaf_options
+            }
+            n_iter_to_use = rf_n_iter
+        elif model_type == 'xgboost':
+            current_param_grid = {
+                'classifier__n_estimators': xgb_n_estimators_options,
+                'classifier__learning_rate': xgb_learning_rate_options
+            }
+            n_iter_to_use = xgb_n_iter
+        else:
+            # Fallback for other model types, use original param_grid if provided
+            current_param_grid = param_grid
+            n_iter_to_use = 20 # Default n_iter if not specified for other types
+
+        # Ensure n_iter does not exceed the total number of combinations
+        # For RandomizedSearchCV, n_iter should be <= total combinations
+        # For GridSearchCV, n_iter is not applicable, it runs all combinations
+        from itertools import product
+        total_combinations = 1
+        for values in current_param_grid.values():
+            total_combinations *= len(values)
+        n_iter_to_use = min(n_iter_to_use, total_combinations)
+
+
+        if model_type == 'random_forest' or model_type == 'logistic_regression' or model_type == 'xgboost':
+            search = RandomizedSearchCV(model_pipeline, current_param_grid, cv=CV_FOLDS, scoring='roc_auc', n_iter=n_iter_to_use, n_jobs=-1 if model_type != 'logistic_regression' else 1, verbose=1)
+        else:
+            search = GridSearchCV(model_pipeline, current_param_grid, cv=CV_FOLDS, scoring='roc_auc', n_jobs=-1, verbose=1)
 
         if dask_client:
             logger.info(f"Using Dask for parallel processing: {dask_client.dashboard_link}")

@@ -6,6 +6,8 @@ from dask.distributed import Client
 from typing import Optional
 import logging
 import mlflow # Added for MLflow integration
+from config import DASK_TYPE, COILED_META_CLASSIFIERS
+from sklearn.model_selection import cross_val_score # For meta-classifier selection
 
 def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, meta_classifier, dask_client: Optional[Client] = None, n_splits_skf=5):
     logger = logging.getLogger('heart_disease_analysis')
@@ -55,7 +57,34 @@ def train_stacked_model(base_models: dict, X_train, y_train, X_test, y_test, met
 
     # Train meta-classifier
     logger.info("Training meta-classifier...")
-    meta_classifier.fit(oof_predictions, y_train)
+    best_meta_classifier = None
+    if DASK_TYPE in ['coiled', 'cloud'] and COILED_META_CLASSIFIERS:
+        logger.info("Selecting best meta-classifier from COILED_META_CLASSIFIERS...")
+        best_roc_auc = -1
+        for i, current_meta_classifier in enumerate(COILED_META_CLASSIFIERS):
+            logger.info(f"Evaluating meta-classifier {i+1}/{len(COILED_META_CLASSIFIERS)}: {current_meta_classifier.__class__.__name__}")
+            # Use cross-validation to select the best meta-classifier
+            # Ensure X_train is a pandas DataFrame for scikit-learn's cross_val_score
+            if hasattr(oof_predictions, 'compute'):
+                oof_predictions_pd = oof_predictions.compute()
+                y_train_pd = y_train.compute()
+            else:
+                oof_predictions_pd = oof_predictions
+                y_train_pd = y_train
+
+            cv_scores = cross_val_score(current_meta_classifier, oof_predictions_pd, y_train_pd, cv=n_splits_skf, scoring='roc_auc', n_jobs=-1)
+            mean_roc_auc = np.mean(cv_scores)
+            logger.info(f"  ROC AUC: {mean_roc_auc:.4f}")
+
+            if mean_roc_auc > best_roc_auc:
+                best_roc_auc = mean_roc_auc
+                best_meta_classifier = current_meta_classifier
+        logger.info(f"Selected best meta-classifier: {best_meta_classifier.__class__.__name__} with ROC AUC: {best_roc_auc:.4f}")
+    else:
+        best_meta_classifier = meta_classifier # Use the default meta_classifier passed in
+
+    best_meta_classifier.fit(oof_predictions, y_train)
+    meta_classifier = best_meta_classifier # Update meta_classifier to the best one found
 
     # Make predictions with stacked model
     y_pred_stacked = meta_classifier.predict(test_predictions)
