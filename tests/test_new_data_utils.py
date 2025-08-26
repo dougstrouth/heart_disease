@@ -33,7 +33,7 @@ class TestPandasDataUtils(unittest.TestCase):
                     self.assertTrue(pd.api.types.is_float_dtype(processed_df[col].dtype), f"Column {col} expected float, got {processed_df[col].dtype}")
                 else:
                     # For other types (like object for categorical), allow 'object' or string dtypes
-                    if expected_type == object:
+                    if expected_type is object:
                         self.assertTrue(
                             processed_df[col].dtype == object or pd.api.types.is_string_dtype(processed_df[col].dtype),
                             f"Column {col} expected object or string dtype, got {processed_df[col].dtype}"
@@ -73,7 +73,7 @@ class TestDaskDataUtils(unittest.TestCase):
                     self.assertTrue(pd.api.types.is_float_dtype(processed_df[col].dtype), f"Column {col} expected float, got {processed_df[col].dtype}")
                 else:
                     # For other types (like object for categorical), allow 'object' or string dtypes
-                    if expected_type == object:
+                    if expected_type is object:
                         self.assertTrue(
                             processed_df[col].dtype == object or pd.api.types.is_string_dtype(processed_df[col].dtype),
                             f"Column {col} expected object or string dtype, got {processed_df[col].dtype}"
