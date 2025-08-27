@@ -1,5 +1,4 @@
 import mlflow
-import pandas as pd
 
 def review_and_register_model(experiment_name="/Shared/Heart Disease Analysis", top_n=1):
     """

@@ -11,6 +11,26 @@ This project provides a comprehensive pipeline for analyzing the Heart Disease d
 - **Orchestration**: A centralized `main.py` orchestrator to run different stages of the pipeline based on a configuration file.
 - **Dask Integration**: Supports both local (Pandas) and distributed (Dask) computation for scalability.
 
+## Model Choices
+
+This project utilizes a selection of classification models, each chosen for specific strengths in predictive modeling:
+
+-   **Logistic Regression**: As a fundamental linear model, Logistic Regression serves as an excellent baseline. It's computationally efficient, highly interpretable, and provides a clear understanding of the relationship between features and the target variable. Its simplicity makes it a good starting point for evaluating model performance.
+
+-   **Random Forest**: This is an ensemble learning method that operates by constructing a multitude of decision trees at training time and outputting the class that is the mode of the classes (classification) or mean prediction (regression) of the individual trees. Random Forests are chosen for their ability to:
+    -   Handle non-linear relationships and interactions between features.
+    -   Reduce overfitting compared to individual decision trees.
+    -   Provide robust performance with minimal hyperparameter tuning.
+    -   Offer insights into feature importance, helping to understand which variables contribute most to the prediction.
+
+-   **XGBoost (Extreme Gradient Boosting)**: XGBoost is an optimized distributed gradient boosting library designed to be highly efficient, flexible, and portable. It implements machine learning algorithms under the Gradient Boosting framework. XGBoost is selected for its:
+    -   **High Performance**: It consistently delivers state-of-the-art results on a wide range of machine learning tasks, particularly with structured data.
+    -   **Speed and Scalability**: Optimized algorithms and parallel processing capabilities make it very fast and scalable.
+    -   **Regularization**: Includes L1 and L2 regularization to prevent overfitting, leading to more generalized models.
+    -   **Handling Missing Values**: It has a built-in capability to handle missing values.
+
+By including these three diverse models, the project aims to explore a range of modeling approaches, from simple linear methods to complex ensemble techniques, to identify the most effective solution for heart disease prediction.
+
 ## Data
 
 This project uses a combination of datasets to analyze heart disease. The primary dataset is the UCI Heart Disease dataset, which contains 14 attributes from 76 attributes, including age, sex, chest pain type, resting blood pressure, cholesterol, and other clinical and lifestyle attributes. The goal is to predict the presence of heart disease.
@@ -123,6 +143,14 @@ python main.py
 
 3.  **Run the Main Analysis with the Best Model**:
     -   You can now update your analysis script to use the newly registered model for further analysis or inference.
+
+## Testing and Verification
+
+This project employs a robust testing strategy to ensure the correctness and reliability of the codebase, particularly when dealing with different execution environments and hyperparameter tuning.
+
+-   **Unit Testing with `pytest`**: All core functionalities, including data processing, model training, and hyperparameter tuning logic, are covered by unit tests using the `pytest` framework.
+-   **Environment Simulation with `unittest.mock.patch`**: To facilitate rapid development and avoid unnecessary cloud costs, tests extensively utilize `unittest.mock.patch`. This allows for simulating various `DASK_TYPE` configurations (`local`, `cloud`, `coiled`) and their interactions with components like `RandomizedSearchCV` and `Optuna` without requiring actual distributed clusters or GCS access. This ensures that the logic for selecting parameter grids and iteration counts (`n_iter`) behaves as expected across different deployment scenarios.
+-   **Methodology Verification**: Recent efforts have focused on refining the testing methodology to accurately reflect the behavior of the `train_evaluate_model` function when integrated with Optuna's hyperparameter search. This includes verifying that `RandomizedSearchCV` performs the correct number of fits (e.g., `n_iter=1` for single Optuna trials in test mode) and uses the appropriate parameter grids based on the `DASK_TYPE` and `config.py` settings.
 
 ## Scripts Overview
 

@@ -1,4 +1,3 @@
-import logging
 from config import RUN_ANALYSIS, HYPERPARAMETER_TUNING_CONFIG, RUN_EXPERIMENT_REVIEW
 from heart_disease_analysis import run_analysis
 from hyperparameter_tuning import run_tuning
