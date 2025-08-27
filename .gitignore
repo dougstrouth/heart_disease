@@ -193,3 +193,4 @@ run_logs.csv
 # macOS specific
 .DS_Store
 combined_heart_disease_dataset.csv
+.DS_Store
