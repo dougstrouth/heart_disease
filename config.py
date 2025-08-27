@@ -3,7 +3,7 @@ RUN_ANALYSIS = False
 RUN_HYPERPARAMETER_TUNING = False
 HYPERPARAMETER_TUNING_CONFIG = {
     "run": True,
-    "cloud_run_mode": "test",  # "test" or "full"
+    "cloud_run_mode": "full",  # "test" or "full"
     "coiled_max_time_hours": 2,
 }
 RUN_EXPERIMENT_REVIEW = False
@@ -51,7 +51,7 @@ RF_RANDOM_SEARCH_N_ITER = 20 # Number of iterations for RandomizedSearchCV for R
 LR_RANDOM_SEARCH_N_ITER = 20 # Number of iterations for RandomizedSearchCV for Logistic Regression
 XGB_RANDOM_SEARCH_N_ITER = 20 # Number of iterations for RandomizedSearchCV for XGBoost
 
-CV_FOLDS = 5 # Number of cross-validation folds for GridSearchCV/RandomizedSearchCV
+CV_FOLDS = 7 # Number of cross-validation folds for GridSearchCV/RandomizedSearchCV
 
 # --- Coiled-Specific Configuration for Enhanced Search (Optional) ---
 # These parameters will be used when DASK_TYPE is 'coiled' or 'cloud'
