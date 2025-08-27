@@ -11,13 +11,15 @@ def main():
     logger = setup_logging()
     logger.info("--- Starting Orchestration ---")
 
-    if RUN_ANALYSIS:
-        logger.info("--- Running Full Analysis ---")
-        run_analysis()
+    best_params = None # Initialize best_params
 
     if HYPERPARAMETER_TUNING_CONFIG.get("run", False):
         logger.info("--- Running Hyperparameter Tuning ---")
-        run_tuning(HYPERPARAMETER_TUNING_CONFIG)
+        best_params = run_tuning(HYPERPARAMETER_TUNING_CONFIG) # Capture best_params
+
+    if RUN_ANALYSIS:
+        logger.info("--- Running Full Analysis ---")
+        run_analysis(best_params=best_params) # Pass best_params
 
     if RUN_EXPERIMENT_REVIEW:
         logger.info("--- Running Experiment Review ---")

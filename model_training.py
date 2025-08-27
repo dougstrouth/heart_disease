@@ -29,11 +29,12 @@ from config import (
 
 # Import stacking utility
 
-def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_test_processed, model_type='logistic_regression', param_grid=None, dask_client: Optional[Client] = None):
+def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_test_processed, model_type='logistic_regression', param_grid=None, dask_client: Optional[Client] = None, best_params: Optional[dict] = None):
     logger = logging.getLogger('heart_disease_analysis')
     """
     Trains and evaluates a specified machine learning model.
     If param_grid is provided, performs GridSearchCV for hyperparameter tuning.
+    If best_params are provided, uses those parameters directly.
     """
     if X_train is None or y_train is None:
         logger.error("Cannot train/evaluate: Data is None.")
@@ -56,7 +57,41 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_
 
     model_pipeline = Pipeline(steps=[('classifier', classifier)])
 
-    if param_grid:
+    # If best_params are provided, use them directly
+    if best_params:
+        logger.info(f"\nTraining {model_name} model with provided best parameters...")
+        # Map Optuna parameter names to sklearn pipeline parameter names
+        # This mapping needs to be robust for different model types
+        model_specific_best_params = {}
+        if model_type == 'logistic_regression':
+            if 'lr_C' in best_params: # Assuming Optuna param name is 'lr_C'
+                model_specific_best_params['classifier__C'] = best_params['lr_C']
+        elif model_type == 'random_forest':
+            if 'rf_n_estimators' in best_params:
+                model_specific_best_params['classifier__n_estimators'] = best_params['rf_n_estimators']
+            if 'rf_max_depth' in best_params:
+                model_specific_best_params['classifier__max_depth'] = best_params['rf_max_depth']
+            if 'rf_min_samples_split' in best_params:
+                model_specific_best_params['classifier__min_samples_split'] = best_params['rf_min_samples_split']
+            if 'rf_min_samples_leaf' in best_params:
+                model_specific_best_params['classifier__min_samples_leaf'] = best_params['rf_min_samples_leaf']
+        elif model_type == 'xgboost':
+            if 'xgb_n_estimators' in best_params:
+                model_specific_best_params['classifier__n_estimators'] = best_params['xgb_n_estimators']
+            if 'xgb_learning_rate' in best_params:
+                model_specific_best_params['classifier__learning_rate'] = best_params['xgb_learning_rate']
+
+        # Apply best parameters to the classifier
+        classifier.set_params(**model_specific_best_params)
+        model_pipeline = Pipeline(steps=[('classifier', classifier)])
+        model_pipeline.fit(X_train, y_train)
+        best_model = model_pipeline
+        logger.info("Training complete with best parameters.")
+        # Set search_best_params and search_best_score for logging consistency
+        search_best_params = model_specific_best_params
+        search_best_score = None # No CV score from a direct fit
+
+    elif param_grid: # Original logic for RandomizedSearchCV
         logger.info(f"\nPerforming GridSearchCV for {model_name}...")
 
         # Determine which parameter options and n_iter to use based on DASK_TYPE
@@ -136,21 +171,27 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_
             search.fit(X_train, y_train)
 
         best_model = search.best_estimator_
+        search_best_params = search.best_params_
+        search_best_score = search.best_score_
         logger.info(f"GridSearchCV complete for {model_name}.")
-        logger.info(f"Best parameters for {model_name}: {search.best_params_}")
-        logger.info(f"Best ROC AUC score for {model_name}: {search.best_score_:.4f}")
+        logger.info(f"Best parameters for {model_name}: {search_best_params}")
+        logger.info(f"Best ROC AUC score for {model_name}: {search_best_score:.4f}")
 
-        # MLflow: Log best parameters and best CV score
-        # MLflow: Log best parameters with model-specific prefixes
-        for param_name, param_value in search.best_params_.items():
-            mlflow.log_param(f"{model_type}_{param_name}", param_value)
-        mlflow.log_metric(f"{model_type}_best_cv_roc_auc", search.best_score_)
-
-    else:
-        logger.info(f"\nTraining {model_name} model (without tuning)...")
+    else: # Fallback if no best_params and no param_grid
+        logger.info(f"\nTraining {model_name} model (without tuning)...\n")
+        model_pipeline = Pipeline(steps=[('classifier', classifier)])
         model_pipeline.fit(X_train, y_train)
         best_model = model_pipeline
         logger.info("Training complete.")
+        search_best_params = None
+        search_best_score = None
+
+    # MLflow: Log best parameters and best CV score (use search_best_params and search_best_score)
+    if search_best_params:
+        for param_name, param_value in search_best_params.items():
+            mlflow.log_param(f"{model_type}_{param_name}", param_value)
+    if search_best_score is not None:
+        mlflow.log_metric(f"{model_type}_best_cv_roc_auc", search_best_score)
 
     # MLflow: Log the trained model
     # Ensure input_example is a Dask DataFrame head if X_train_processed is Dask
@@ -204,8 +245,8 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_
         'roc_auc': roc_auc,
         'confusion_matrix': conf_matrix,
         'classification_report': class_report_dict,
-        'best_params': search.best_params_ if param_grid else None,
-        'best_cv_score': search.best_score_ if param_grid else None,
+        'best_params': search_best_params,
+        'best_cv_score': search_best_score,
         'train_accuracy': train_accuracy,
         'train_roc_auc': train_roc_auc
     }

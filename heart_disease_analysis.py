@@ -15,7 +15,7 @@ from config import (
     LOCAL_UCI_PATH, LOCAL_SYNTHETIC_PATH, LOCAL_JOHNSMITH_PATH, GCS_DATA_PATH
 )
 
-def run_analysis():
+def run_analysis(best_params=None):
     """Main function to run the data analysis pipeline."""
     # load env variables
     load_dotenv()
@@ -31,8 +31,10 @@ def run_analysis():
     if DASK_TYPE in ['coiled', 'cloud']:
         logger.info(f"Using Dask to process data from GCS: {GCS_DATA_PATH}")
         # Add dtype specification from previous step to handle mixed types
-        dtype_spec = {'ca': 'object', 'cp': 'object', 'restecg': 'object', 'sex': 'object', 'slope': 'object', 'thal': 'object'}
+        dtype_spec = {'ca': 'object', 'cp': 'object', 'restecg': 'object', 'object': 'object', 'slope': 'object', 'thal': 'object'}
         processed_df = dd.read_csv(GCS_DATA_PATH, dtype=dtype_spec, na_values=['?'])
+        logger.info("Removing duplicate rows from the Dask DataFrame...")
+        processed_df = processed_df.drop_duplicates()
     elif DASK_TYPE == 'local':
         logger.info("Using Dask to process data from local files.")
         processed_df = dask_get_processed_data(
@@ -68,7 +70,7 @@ def run_analysis():
     try:
         if RUN_MODELING and processed_df is not None:
             lr_model, lr_metrics, rf_model, rf_metrics, xgb_model, xgb_metrics, stacked_model, stacked_metrics, X, y, preprocessor, stacked_input_example = run_model_pipeline(
-                dask_client, processed_df, VERBOSE_OUTPUT, True, META_CLASSIFIER
+                dask_client, processed_df, VERBOSE_OUTPUT, True, META_CLASSIFIER, best_params=best_params
             )
 
             # Perform final cross-validation for robustness

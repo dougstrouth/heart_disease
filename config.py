@@ -1,10 +1,9 @@
 # --- Orchestration ---
 RUN_ANALYSIS = False
-RUN_HYPERPARAMETER_TUNING = False
 HYPERPARAMETER_TUNING_CONFIG = {
     "run": True,
     "cloud_run_mode": "full",  # "test" or "full"
-    "coiled_max_time_hours": 2,
+    "coiled_max_time_hours": 1.1,
 }
 RUN_EXPERIMENT_REVIEW = False
 

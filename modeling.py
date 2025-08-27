@@ -19,7 +19,7 @@ from model_interpretation import interpret_model
 from preprocessing import get_preprocessor, get_feature_names
 from utils.logging_utils import log_run_results
 
-def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ensemble, meta_classifier):
+def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ensemble, meta_classifier, best_params=None):
     logger = logging.getLogger('heart_disease_analysis')
     logger.info("\n--- Model Training, Evaluation, and Interpretation ---")
 
@@ -81,7 +81,7 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
 
     # Logistic Regression
     lr_param_grid = {'classifier__C': current_lr_c_options}
-    lr_model, _, _, lr_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='logistic_regression', param_grid=lr_param_grid, dask_client=dask_client)
+    lr_model, _, _, lr_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='logistic_regression', param_grid=lr_param_grid, dask_client=dask_client, best_params=best_params)
 
     # Random Forest
     rf_param_grid = {
@@ -90,14 +90,14 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
         'classifier__min_samples_split': current_rf_min_samples_split_options,
         'classifier__min_samples_leaf': current_rf_min_samples_leaf_options
     }
-    rf_model, _, _, rf_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='random_forest', param_grid=rf_param_grid, dask_client=dask_client)
+    rf_model, _, _, rf_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='random_forest', param_grid=rf_param_grid, dask_client=dask_client, best_params=best_params)
 
     # XGBoost
     xgb_param_grid = {
         'classifier__n_estimators': current_xgb_n_estimators_options,
         'classifier__learning_rate': current_xgb_learning_rate_options
     }
-    xgb_model, _, _, xgb_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='xgboost', param_grid=xgb_param_grid, dask_client=dask_client)
+    xgb_model, _, _, xgb_metrics = train_evaluate_model(X_train_processed, y_train, X_test_processed, y_test, X_train_processed, X_test_processed, model_type='xgboost', param_grid=xgb_param_grid, dask_client=dask_client, best_params=best_params)
 
     stacked_model = None
     stacked_metrics = None
@@ -110,6 +110,7 @@ def run_model_pipeline(dask_client, combined_df, verbose_output, run_stacked_ens
         interpret_model(rf_model, X_train_processed, feature_names)
 
     return lr_model, lr_metrics, rf_model, rf_metrics, xgb_model, xgb_metrics, stacked_model, stacked_metrics, X, y, preprocessor, stacked_input_example
+
 
 
 def perform_final_model_evaluation(model, X_original, y_original, fitted_preprocessor, model_name, dask_client, verbose_output):
