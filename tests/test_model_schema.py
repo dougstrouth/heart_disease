@@ -10,6 +10,7 @@ from xgboost import XGBClassifier
 from preprocessing import get_preprocessor
 from ensemble_utils import train_stacked_model
 from config import META_CLASSIFIER
+from data_schema import HeartDiseaseSchema
 
 # Define dummy data for testing
 @pytest.fixture
@@ -38,10 +39,7 @@ def dummy_data():
     df = pd.DataFrame(data)
 
     # Explicitly convert categorical and binary columns to object (string) dtype
-    categorical_cols = ['sex', 'cp', 'restecg', 'slope', 'thal']
-    binary_cols = ['fbs', 'exang', 'smoking', 'diabetes']
-    
-    for col in categorical_cols + binary_cols:
+    for col in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE():
         if col in df.columns:
             df[col] = df[col].astype(str)
 
@@ -49,25 +47,28 @@ def dummy_data():
 
 @pytest.fixture
 def processed_data_and_models(dummy_data):
-    X = dummy_data.drop('heart_disease', axis=1)
-    y = dummy_data['heart_disease']
+    X = dummy_data.drop(HeartDiseaseSchema.TARGET_COLUMN, axis=1)
+    y = dummy_data[HeartDiseaseSchema.TARGET_COLUMN]
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-    # Define features based on your config.py (assuming these are consistent)
-    NUMERICAL_FEATURES = ['age', 'trestbps', 'chol', 'thalach', 'oldpeak', 'ca', 'bmi']
-    CATEGORICAL_FEATURES = ['sex', 'cp', 'restecg', 'slope', 'thal']
-    BINARY_FEATURES = ['fbs', 'exang', 'smoking', 'diabetes']
+    # Define features based on HeartDiseaseSchema
+    NUMERICAL_FEATURES = HeartDiseaseSchema.NUMERICAL_COLUMNS()
+    CATEGORICAL_FEATURES = HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE()
+    # Identify binary features from the schema's categorical mappings
+    BINARY_FEATURES = [col for col in HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE() if col in ["fbs", "exang", "smoking", "diabetes"]]
 
-    preprocessor = get_preprocessor(CATEGORICAL_FEATURES, NUMERICAL_FEATURES, BINARY_FEATURES)
+    preprocessor = get_preprocessor(CATEGORICAL_FEATURES, NUMERICAL_FEATURES, BINARY_FEATURES, use_dask_ml=False)
 
     # Fit the preprocessor on the full training data to learn all categories
     preprocessor.fit(X_train)
-    # Transform a dummy row to get the number of features after transformation
-    expected_features = preprocessor.transform(X_train.head(1)).shape[1]
 
+    # Process X_train and X_test
     X_train_processed = preprocessor.transform(X_train)
     X_test_processed = preprocessor.transform(X_test)
+
+    # Get the number of features after transformation from the processed training data
+    expected_features = X_train_processed.shape[1]
 
     # Train dummy base models
     lr_model = Pipeline(steps=[('classifier', LogisticRegression(solver='liblinear', random_state=42))])

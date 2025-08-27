@@ -1,4 +1,4 @@
 {
-    "CodeGPT.apiKey": "Anthropic",
+    "CodeGPT.apiKey": "Gemini CLI",
     "python.analysis.autoImportCompletions": true
 }

@@ -5,6 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
+# Dataset csv
+combined_heart_disease_dataset.csv
 
 # Distribution / packaging
 .Python
@@ -189,4 +191,6 @@ combined_heart_disease_dataset.csv
 run_logs.csv
 
 # macOS specific
+.DS_Store
+combined_heart_disease_dataset.csv
 .DS_Store
