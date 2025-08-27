@@ -11,6 +11,12 @@ This project provides a comprehensive pipeline for analyzing the Heart Disease d
 - **Orchestration**: A centralized `main.py` orchestrator to run different stages of the pipeline based on a configuration file.
 - **Dask Integration**: Supports both local (Pandas) and distributed (Dask) computation for scalability.
 
+## Data
+
+This project uses a combination of datasets to analyze heart disease. The primary dataset is the UCI Heart Disease dataset, which contains 14 attributes from 76 attributes, including age, sex, chest pain type, resting blood pressure, cholesterol, and other clinical and lifestyle attributes. The goal is to predict the presence of heart disease.
+
+In addition to the UCI dataset, this project also uses synthetic datasets for testing and development purposes. These synthetic datasets are designed to mimic the structure and characteristics of the original UCI dataset.
+
 ## Project Structure
 
 ```
@@ -82,7 +88,10 @@ The `config.py` file is used to control the behavior of the pipeline. Here are t
 ### Orchestration
 
 -   **`RUN_ANALYSIS`**: (boolean) If `True`, runs the main data analysis pipeline from `heart_disease_analysis.py`.
--   **`RUN_HYPERPARAMETER_TUNING`**: (boolean) If `True`, runs the hyperparameter tuning script.
+-   **`HYPERPARAMETER_TUNING_CONFIG`**: (dict) A dictionary to control hyperparameter tuning.
+    -   `"run"`: (boolean) If `True`, runs the hyperparameter tuning script.
+    -   `"cloud_run_mode"`: (string) Can be `"test"` or `"full"`. In `"test"` mode, it runs a single trial to verify functionality. `"full"` runs the complete tuning.
+    -   `"coiled_max_time_hours"`: (int) The maximum time in hours for the Coiled run to complete.
 -   **`RUN_EXPERIMENT_REVIEW`**: (boolean) If `True`, runs the experiment review script to find the best model and register it.
 
 ### General Configuration
@@ -104,11 +113,12 @@ python main.py
 ### Recommended Workflow
 
 1.  **Run Hyperparameter Tuning**:
-    -   In `config.py`, set `RUN_HYPERPARAMETER_TUNING = True` and the other orchestration flags to `False`.
+    -   In `config.py`, set `HYPERPARAMETER_TUNING_CONFIG["run"] = True` and the other orchestration flags to `False`.
+    -   Configure `cloud_run_mode` and `coiled_max_time_hours` as needed.
     -   Run `python main.py`. This will execute the Optuna study and log all the experiment runs to MLflow.
 
 2.  **Review Experiments and Register the Best Model**:
-    -   Once the tuning is complete, change `config.py` to have `RUN_HYPERPARAMETER_TUNING = False` and `RUN_EXPERIMENT_REVIEW = True`.
+    -   Once the tuning is complete, change `config.py` to have `HYPERPARAMETER_TUNING_CONFIG["run"] = False` and `RUN_EXPERIMENT_REVIEW = True`.
     -   Run `python main.py` again. This will analyze the runs from the previous step, print a summary of the best one, and register the best model in the MLflow Model Registry.
 
 3.  **Run the Main Analysis with the Best Model**:

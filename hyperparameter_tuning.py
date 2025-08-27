@@ -84,11 +84,29 @@ def objective(trial, dask_client):
 
         return roc_auc
 
-def run_tuning(n_trials=100):
+def run_tuning(tuning_config):
     dask_client = get_dask_client(cluster_type=DASK_TYPE)
     try:
         study = optuna.create_study(direction="maximize")
-        study.optimize(lambda trial: objective(trial, dask_client), n_trials=n_trials)
+        
+        n_trials = 100  # Default number of trials
+        timeout_seconds = None
+
+        if DASK_TYPE == 'cloud' and tuning_config.get('cloud_run_mode') == 'test':
+            print("Cloud run detected in 'test' mode. Running a single trial to verify functionality.")
+            n_trials = 1
+        
+        if DASK_TYPE == 'coiled':
+            max_time_hours = tuning_config.get('coiled_max_time_hours')
+            if max_time_hours:
+                timeout_seconds = max_time_hours * 3600
+                print(f"Coiled run detected. Setting timeout to {max_time_hours} hour(s) ({timeout_seconds} seconds).")
+
+        study.optimize(
+            lambda trial: objective(trial, dask_client),
+            n_trials=n_trials,
+            timeout=timeout_seconds
+        )
 
         print("Number of finished trials: ", len(study.trials))
         print("Best trial:")

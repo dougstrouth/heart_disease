@@ -1,5 +1,5 @@
 import logging
-from config import RUN_ANALYSIS, RUN_HYPERPARAMETER_TUNING, RUN_EXPERIMENT_REVIEW
+from config import RUN_ANALYSIS, HYPERPARAMETER_TUNING_CONFIG, RUN_EXPERIMENT_REVIEW
 from heart_disease_analysis import run_analysis
 from hyperparameter_tuning import run_tuning
 from review_experiments import review_and_register_model
@@ -16,9 +16,9 @@ def main():
         logger.info("--- Running Full Analysis ---")
         run_analysis()
 
-    if RUN_HYPERPARAMETER_TUNING:
+    if HYPERPARAMETER_TUNING_CONFIG.get("run", False):
         logger.info("--- Running Hyperparameter Tuning ---")
-        run_tuning()
+        run_tuning(HYPERPARAMETER_TUNING_CONFIG)
 
     if RUN_EXPERIMENT_REVIEW:
         logger.info("--- Running Experiment Review ---")

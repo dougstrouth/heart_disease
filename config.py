@@ -1,6 +1,11 @@
 # --- Orchestration ---
 RUN_ANALYSIS = False
-RUN_HYPERPARAMETER_TUNING = True
+RUN_HYPERPARAMETER_TUNING = False
+HYPERPARAMETER_TUNING_CONFIG = {
+    "run": True,
+    "cloud_run_mode": "test",  # "test" or "full"
+    "coiled_max_time_hours": 1,
+}
 RUN_EXPERIMENT_REVIEW = False
 
 from sklearn.linear_model import LogisticRegression

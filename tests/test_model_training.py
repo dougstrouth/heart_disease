@@ -26,8 +26,9 @@ def mock_mlflow():
     ):
         yield mock_log_param, mock_log_metric, mock_log_sklearn_model, mock_log_xgboost_model
 
+@patch('model_training.DASK_TYPE', 'local')
 @patch('model_training.RandomizedSearchCV')
-def test_train_evaluate_model_lr_n_jobs(mock_randomized_search_cv, mock_mlflow):
+def test_train_evaluate_model_lr_n_jobs(mock_randomized_search_cv, mock_mlflow, mock_dask_type):
     # Configure the mock to return a mock estimator
     mock_instance = MagicMock()
     mock_instance.best_estimator_ = MagicMock()
@@ -53,8 +54,9 @@ def test_train_evaluate_model_lr_n_jobs(mock_randomized_search_cv, mock_mlflow):
     assert mock_randomized_search_cv.call_args[1]['n_jobs'] == 1
     assert mock_randomized_search_cv.call_args[1]['verbose'] == 1
 
+@patch('model_training.DASK_TYPE', 'local')
 @patch('model_training.RandomizedSearchCV')
-def test_train_evaluate_model_rf_param_grid(mock_randomized_search_cv, mock_mlflow):
+def test_train_evaluate_model_rf_param_grid(mock_randomized_search_cv, mock_mlflow, mock_dask_type):
     # Configure the mock to return a mock estimator
     mock_instance = MagicMock()
     mock_instance.best_estimator_ = MagicMock()
