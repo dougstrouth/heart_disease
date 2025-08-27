@@ -17,10 +17,14 @@ from dask.distributed import Client
 import dask.dataframe as dd # Import dask.dataframe
 
 # Import configuration options
-from config import DASK_TYPE, RF_RANDOM_SEARCH_N_ITER, LR_RANDOM_SEARCH_N_ITER, XGB_RANDOM_SEARCH_N_ITER, CV_FOLDS, \
-    COILED_LR_C_OPTIONS, COILED_RF_N_ESTIMATORS_OPTIONS, COILED_RF_MAX_DEPTH_OPTIONS, COILED_RF_MIN_SAMPLES_SPLIT_OPTIONS, COILED_RF_MIN_SAMPLES_LEAF_OPTIONS, \
-    COILED_XGB_N_ESTIMATORS_OPTIONS, COILED_XGB_LEARNING_RATE_OPTIONS, \
+from config import (
+    DASK_TYPE, RF_RANDOM_SEARCH_N_ITER, LR_RANDOM_SEARCH_N_ITER, XGB_RANDOM_SEARCH_N_ITER, CV_FOLDS,
+    LR_C_OPTIONS, RF_N_ESTIMATORS_OPTIONS, RF_MAX_DEPTH_OPTIONS, RF_MIN_SAMPLES_SPLIT_OPTIONS, RF_MIN_SAMPLES_LEAF_OPTIONS,
+    XGB_N_ESTIMATORS_OPTIONS, XGB_LEARNING_RATE_OPTIONS,
+    COILED_LR_C_OPTIONS, COILED_RF_N_ESTIMATORS_OPTIONS, COILED_RF_MAX_DEPTH_OPTIONS, COILED_RF_MIN_SAMPLES_SPLIT_OPTIONS, COILED_RF_MIN_SAMPLES_LEAF_OPTIONS,
+    COILED_XGB_N_ESTIMATORS_OPTIONS, COILED_XGB_LEARNING_RATE_OPTIONS,
     COILED_RF_RANDOM_SEARCH_N_ITER, COILED_LR_RANDOM_SEARCH_N_ITER, COILED_XGB_RANDOM_SEARCH_N_ITER
+)
 
 
 # Import stacking utility
@@ -80,29 +84,35 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_
             lr_n_iter = LR_RANDOM_SEARCH_N_ITER
             xgb_n_iter = XGB_RANDOM_SEARCH_N_ITER
 
-        # Reconstruct param_grid based on selected options
-        current_param_grid = {}
-        if model_type == 'logistic_regression':
-            current_param_grid = {'classifier__C': lr_c_options}
-            n_iter_to_use = lr_n_iter
-        elif model_type == 'random_forest':
-            current_param_grid = {
-                'classifier__n_estimators': rf_n_estimators_options,
-                'classifier__max_depth': rf_max_depth_options,
-                'classifier__min_samples_split': rf_min_samples_split_options,
-                'classifier__min_samples_leaf': rf_min_samples_leaf_options
-            }
-            n_iter_to_use = rf_n_iter
-        elif model_type == 'xgboost':
-            current_param_grid = {
-                'classifier__n_estimators': xgb_n_estimators_options,
-                'classifier__learning_rate': xgb_learning_rate_options
-            }
-            n_iter_to_use = xgb_n_iter
-        else:
-            # Fallback for other model types, use original param_grid if provided
+        # If a param_grid is provided, use it directly. Otherwise, reconstruct based on DASK_TYPE.
+        if param_grid:
             current_param_grid = param_grid
-            n_iter_to_use = 20 # Default n_iter if not specified for other types
+            # When param_grid is provided, n_iter should typically be 1 for RandomizedSearchCV
+            # as Optuna is handling the search.
+            n_iter_to_use = 1
+        else:
+            # Reconstruct param_grid based on selected options (from config)
+            if model_type == 'logistic_regression':
+                current_param_grid = {'classifier__C': lr_c_options}
+                n_iter_to_use = lr_n_iter
+            elif model_type == 'random_forest':
+                current_param_grid = {
+                    'classifier__n_estimators': rf_n_estimators_options,
+                    'classifier__max_depth': rf_max_depth_options,
+                    'classifier__min_samples_split': rf_min_samples_split_options,
+                    'classifier__min_samples_leaf': rf_min_samples_leaf_options
+                }
+                n_iter_to_use = rf_n_iter
+            elif model_type == 'xgboost':
+                current_param_grid = {
+                    'classifier__n_estimators': xgb_n_estimators_options,
+                    'classifier__learning_rate': xgb_learning_rate_options
+                }
+                n_iter_to_use = xgb_n_iter
+            else:
+                # Fallback for other model types, use original param_grid if provided
+                current_param_grid = param_grid # This param_grid would be None here if not provided initially
+                n_iter_to_use = 20 # Default n_iter if not specified for other types
 
         # Ensure n_iter does not exceed the total number of combinations
         # For RandomizedSearchCV, n_iter should be <= total combinations
