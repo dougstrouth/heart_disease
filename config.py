@@ -1,3 +1,8 @@
+# --- Orchestration ---
+RUN_ANALYSIS = False
+RUN_HYPERPARAMETER_TUNING = True
+RUN_EXPERIMENT_REVIEW = False
+
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
@@ -6,7 +11,7 @@ from xgboost import XGBClassifier
 SHOW_PLOTS = False  # Set to True to display plots, False to suppress them
 VERBOSE_OUTPUT = False # Set to True for more detailed print statements
 # Dask type can be 'local', 'coiled', or 'cloud'. 'cloud' uses a local Dask client but loads data from GCS.
-DASK_TYPE = 'coiled'
+DASK_TYPE = 'cloud'
 
 # --- GCS Configuration ---
 GCS_DATA_PATH = "gs://my-heart-disease-data-bucket/data/combined_heart_disease_dataset_3.csv"

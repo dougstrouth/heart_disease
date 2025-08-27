@@ -26,4 +26,5 @@ dependencies = [
     "databricks>=0.2",
     "databricks-sdk>=0.64.0",
     "python-dotenv>=1.1.1",
+    "optuna>=3.6.1",
 ]
