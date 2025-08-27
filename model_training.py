@@ -107,7 +107,6 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_
         # Ensure n_iter does not exceed the total number of combinations
         # For RandomizedSearchCV, n_iter should be <= total combinations
         # For GridSearchCV, n_iter is not applicable, it runs all combinations
-        from itertools import product
         total_combinations = 1
         for values in current_param_grid.values():
             total_combinations *= len(values)

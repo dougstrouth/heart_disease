@@ -6,21 +6,19 @@ from xgboost import XGBClassifier
 SHOW_PLOTS = False  # Set to True to display plots, False to suppress them
 VERBOSE_OUTPUT = False # Set to True for more detailed print statements
 # Dask type can be 'local', 'coiled', or 'cloud'. 'cloud' uses a local Dask client but loads data from GCS.
-DASK_TYPE = 'cloud'
+DASK_TYPE = 'coiled'
 
 # --- GCS Configuration ---
 GCS_DATA_PATH = "gs://my-heart-disease-data-bucket/data/combined_heart_disease_dataset_3.csv"
 
-# --- MLflow Configuration ---
-# Set this environment variable in your terminal before running the script:
-# export MLFLOW_TRACKING_URI="gs://my-heart-disease-data-bucket/mlruns"
-# or for Windows: set MLFLOW_TRACKING_URI=gs://my-heart-disease-data-bucket/mlruns
-# This will store both MLflow metadata and artifacts in the specified GCS bucket.
-MLFLOW_GCS_TRACKING_URI = "gs://my-heart-disease-data-bucket/mlruns"
+# --- Local Data Paths ---
+LOCAL_UCI_PATH = 'tests/test_data/dummy_uci_data.csv'
+LOCAL_SYNTHETIC_PATH = 'tests/test_data/dummy_synthetic_data.csv'
+LOCAL_JOHNSMITH_PATH = 'tests/test_data/dummy_johnsmith_data.csv'
 
 # --- Configuration for Automated Parameter Search ---
 TARGET_RUN_TIME_MINUTES = 5.0  # Target maximum runtime for the full analysis
-MAX_SEARCH_TIME_MINUTES = 5.0 # Maximum time to spend searching for optimal parameters
+MAX_SEARCH_TIME_MINUTES = 10.0 # Maximum time to spend searching for optimal parameters
 RUN_PARAMETER_SEARCH = True   # Set to True to run the automated parameter search
 
 # For local testing with limited resources, consider reducing the search space:
@@ -37,6 +35,7 @@ RF_MIN_SAMPLES_SPLIT_OPTIONS = [2]
 RF_MIN_SAMPLES_LEAF_OPTIONS = [1]
 XGB_N_ESTIMATORS_OPTIONS = [100, 200, 300]
 XGB_LEARNING_RATE_OPTIONS = [0.01, 0.1, 0.2]
+
 
 RF_RANDOM_SEARCH_N_ITER = 20 # Number of iterations for RandomizedSearchCV for Random Forest
 LR_RANDOM_SEARCH_N_ITER = 20 # Number of iterations for RandomizedSearchCV for Logistic Regression

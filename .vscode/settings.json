@@ -1,4 +1,4 @@
 {
-    "CodeGPT.apiKey": "Ollama",
+    "CodeGPT.apiKey": "Gemini CLI",
     "python.analysis.autoImportCompletions": true
 }

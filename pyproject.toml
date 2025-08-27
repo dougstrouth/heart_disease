@@ -23,4 +23,7 @@ dependencies = [
     "pytest",
     "ruff>=0.12.10",
     "pre-commit>=4.3.0",
+    "databricks>=0.2",
+    "databricks-sdk>=0.64.0",
+    "python-dotenv>=1.1.1",
 ]

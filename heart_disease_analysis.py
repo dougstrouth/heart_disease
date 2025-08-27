@@ -1,5 +1,6 @@
 import time
 import dask.dataframe as dd
+from dotenv import load_dotenv
 
 
 from pandas_data_utils import get_processed_data as pandas_get_processed_data, perform_eda
@@ -9,53 +10,42 @@ from utils.logger_config import setup_logging
 from modeling import run_model_pipeline, perform_final_model_evaluation, log_analysis_results
 from dask_utils import get_dask_client
 import mlflow
-from config import DASK_TYPE, SHOW_PLOTS, VERBOSE_OUTPUT, RUN_MODELING, META_CLASSIFIER
+from config import (
+    DASK_TYPE, SHOW_PLOTS, VERBOSE_OUTPUT, RUN_MODELING, META_CLASSIFIER,
+    LOCAL_UCI_PATH, LOCAL_SYNTHETIC_PATH, LOCAL_JOHNSMITH_PATH, GCS_DATA_PATH
+)
 
 def run_analysis():
     """Main function to run the data analysis pipeline."""
+    # load env variables
+    load_dotenv()
     logger = setup_logging()
     logger.info("--- Starting Heart Disease Analysis ---")
     start_time = time.time()
 
-    # Configure MLflow to log artifacts to GCS.
-    # The tracking URI (for metadata) will use the default MLflow tracking server (Coiled's or local 'mlruns').
-    mlflow.set_artifact_uri("gs://my-heart-disease-data-bucket/mlflow-artifacts")
+    # Configure MLflow experiment
+    experiment_name = "/Shared/Heart Disease Analysis"
+    mlflow.set_experiment(experiment_name)
+    logger.info(f"MLflow experiment set to '{experiment_name}'. Artifacts will be stored in the configured MLflow tracking server.")
 
     if DASK_TYPE in ['coiled', 'cloud']:
-        from config import GCS_DATA_PATH
-        logger.info(f"Using Dask to process data from GCS: {GCS_DATA_PATH}")
-
-    if DASK_TYPE in ['coiled', 'cloud']:
-        from config import GCS_DATA_PATH
-        logger.info(f"Using Dask to process data from GCS: {GCS_DATA_PATH}")
-
-    if DASK_TYPE in ['coiled', 'cloud']:
-        from config import GCS_DATA_PATH
         logger.info(f"Using Dask to process data from GCS: {GCS_DATA_PATH}")
         # Add dtype specification from previous step to handle mixed types
         dtype_spec = {'ca': 'object', 'cp': 'object', 'restecg': 'object', 'sex': 'object', 'slope': 'object', 'thal': 'object'}
         processed_df = dd.read_csv(GCS_DATA_PATH, dtype=dtype_spec, na_values=['?'])
     elif DASK_TYPE == 'local':
         logger.info("Using Dask to process data from local files.")
-        # Define file paths
-        uci_path = 'tests/test_data/dummy_uci_data.csv'
-        synthetic_path = 'tests/test_data/dummy_synthetic_data.csv'
-        johnsmith_path = 'tests/test_data/dummy_johnsmith_data.csv'
         processed_df = dask_get_processed_data(
-            uci_path=uci_path,
-            synthetic_path=synthetic_path,
-            johnsmith_path=johnsmith_path
+            uci_path=LOCAL_UCI_PATH,
+            synthetic_path=LOCAL_SYNTHETIC_PATH,
+            johnsmith_path=LOCAL_JOHNSMITH_PATH
         )
     else: # 'pandas'
         logger.info("Using Pandas to process data from local files.")
-        # Define file paths
-        uci_path = 'tests/test_data/dummy_uci_data.csv'
-        synthetic_path = 'tests/test_data/dummy_synthetic_data.csv'
-        johnsmith_path = 'tests/test_data/dummy_johnsmith_data.csv'
         processed_df = pandas_get_processed_data(
-            uci_path=uci_path,
-            synthetic_path=synthetic_path,
-            johnsmith_path=johnsmith_path
+            uci_path=LOCAL_UCI_PATH,
+            synthetic_path=LOCAL_SYNTHETIC_PATH,
+            johnsmith_path=LOCAL_JOHNSMITH_PATH
         )
 
     logger.info(f"Data processing completed in {time.time() - start_time:.2f} seconds.")
@@ -87,7 +77,7 @@ def run_analysis():
             xgb_cv_mean, xgb_cv_std = perform_final_model_evaluation(xgb_model, X, y, preprocessor, "XGBoost", dask_client, VERBOSE_OUTPUT)
 
             stacked_cv_mean, stacked_cv_std = None, None
-            if True and stacked_model is not None:
+            if stacked_model is not None:
                 stacked_cv_mean, stacked_cv_std = perform_final_model_evaluation(stacked_model, X, y, preprocessor, "Stacked Ensemble", dask_client, VERBOSE_OUTPUT)
 
             log_analysis_results(start_time, DASK_TYPE, lr_metrics, rf_metrics, xgb_metrics, stacked_metrics, True, lr_cv_mean, lr_cv_std, rf_cv_mean, rf_cv_std, xgb_cv_mean, xgb_cv_std, stacked_cv_mean, stacked_cv_std)
@@ -96,7 +86,7 @@ def run_analysis():
             mlflow.log_metric("lr_cv_roc_auc", float(lr_cv_mean))
             mlflow.log_metric("rf_cv_roc_auc", float(rf_cv_mean))
             mlflow.log_metric("xgb_cv_roc_auc", float(xgb_cv_mean))
-            if True and stacked_cv_mean is not None:
+            if stacked_model is not None:
                 mlflow.log_metric("stacked_cv_roc_auc", float(stacked_cv_mean))
 
             # Create a processed input example for MLflow logging
@@ -110,7 +100,7 @@ def run_analysis():
             mlflow.sklearn.log_model(lr_model, name="logistic_regression_model", input_example=processed_input_example)
             mlflow.sklearn.log_model(rf_model, name="random_forest_model", input_example=processed_input_example)
             mlflow.xgboost.log_model(xgb_model.named_steps['classifier'], name="xgboost_model", input_example=processed_input_example)
-            if True and stacked_model is not None:
+            if stacked_model is not None:
                 mlflow.sklearn.log_model(stacked_model, name="stacked_ensemble_model", input_example=stacked_input_example[:5])
         
     except Exception as e:
@@ -123,5 +113,3 @@ def run_analysis():
 
 if __name__ == "__main__":
     run_analysis()
-        
-
