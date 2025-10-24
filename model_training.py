@@ -43,7 +43,7 @@ def train_evaluate_model(X_train, y_train, X_test, y_test, X_train_processed, X_
     best_model: Any
 
     if model_type == 'logistic_regression':
-        classifier = LogisticRegression(solver='liblinear', random_state=42, max_iter=1000)
+        classifier = LogisticRegression(solver='liblinear', random_state=42, max_iter=1000, n_jobs=1)
         model_name = "Logistic Regression"
     elif model_type == 'random_forest':
         classifier = RandomForestClassifier(random_state=42)

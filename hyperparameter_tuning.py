@@ -32,7 +32,7 @@ def objective(trial, dask_client):
         if DASK_TYPE in ['coiled', 'cloud']:
             dtype_spec = {'ca': 'object', 'cp': 'object', 'restecg': 'object', 'sex': 'object', 'slope': 'object', 'thal': 'object'}
             processed_df = dd.read_csv(GCS_DATA_PATH, dtype=dtype_spec, na_values=['?'])
-            processed_df = processed_df.drop_duplicates()
+            
         elif DASK_TYPE == 'local':
             processed_df = dask_get_processed_data(
                 uci_path=LOCAL_UCI_PATH,

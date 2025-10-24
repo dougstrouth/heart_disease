@@ -83,6 +83,11 @@ def combine_and_save_all_datasets(output_csv_path="combined_heart_disease_datase
         logger.error("Dataset combination failed. Exiting.")
         return None
 
+    # Remove duplicates and reset index after combining
+    logger.info(f"Combined DataFrame has {len(combined_df)} rows before duplicate removal.")
+    combined_df = combined_df.drop_duplicates().reset_index(drop=True)
+    logger.info(f"Combined DataFrame has {len(combined_df)} rows after duplicate removal.")
+
     logger.info("Preprocessing combined dataset...")
     final_combined_df = preprocess_data(combined_df)
 

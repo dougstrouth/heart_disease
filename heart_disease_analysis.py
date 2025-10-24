@@ -27,14 +27,14 @@ def run_analysis(best_params=None):
     experiment_name = "/Shared/Heart Disease Analysis"
     mlflow.set_experiment(experiment_name)
     logger.info(f"MLflow experiment set to '{experiment_name}'. Artifacts will be stored in the configured MLflow tracking server.")
+    mlflow.set_tag("data_processing_strategy", "early_deduplication")
 
     if DASK_TYPE in ['coiled', 'cloud']:
         logger.info(f"Using Dask to process data from GCS: {GCS_DATA_PATH}")
         # Add dtype specification from previous step to handle mixed types
-        dtype_spec = {'ca': 'object', 'cp': 'object', 'restecg': 'object', 'object': 'object', 'slope': 'object', 'thal': 'object'}
+        dtype_spec = {'ca': 'object', 'cp': 'object', 'restecg': 'object', 'sex': 'object', 'slope': 'object', 'thal': 'object'}
         processed_df = dd.read_csv(GCS_DATA_PATH, dtype=dtype_spec, na_values=['?'])
-        logger.info("Removing duplicate rows from the Dask DataFrame...")
-        processed_df = processed_df.drop_duplicates()
+        
     elif DASK_TYPE == 'local':
         logger.info("Using Dask to process data from local files.")
         processed_df = dask_get_processed_data(
@@ -53,6 +53,14 @@ def run_analysis(best_params=None):
     logger.info(f"Data processing completed in {time.time() - start_time:.2f} seconds.")
 
     if processed_df is not None:
+        # Log target variable distribution
+        logger.info(f"Target variable ('{HeartDiseaseSchema.TARGET_COLUMN}') distribution:")
+        if isinstance(processed_df, dd.DataFrame):
+            target_counts = processed_df[HeartDiseaseSchema.TARGET_COLUMN].value_counts().compute()
+        else:
+            target_counts = processed_df[HeartDiseaseSchema.TARGET_COLUMN].value_counts()
+        logger.info(f"\n{target_counts}")
+
         # If using dask, compute the dataframe for EDA
         if isinstance(processed_df, dd.DataFrame):
                         perform_eda(processed_df.compute(), "Combined Dataset", HeartDiseaseSchema.NUMERICAL_COLUMNS(), HeartDiseaseSchema.CATEGORICAL_COLUMNS_TO_ENCODE(), show_plots=SHOW_PLOTS, verbose_output=VERBOSE_OUTPUT)
